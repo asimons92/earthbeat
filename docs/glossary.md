@@ -24,7 +24,7 @@ Modulator is a canvas node that maps a Channel onto an Oscillator parameter. Exa
 
 Oscillator is a canvas node that makes sound. Legal waveforms are sine, square, saw, and noise. The catalog default waveform is sine.
 
-Effect is a canvas node that transforms a control signal on the path into an Oscillator. The first EffectKind is Scale Snap: it snaps Hertz to the nearest equal-temperament pitch in a chosen tonic and named scale. When Enable is off, Hertz passes through unchanged.
+Effect is a canvas node that transforms a signal around an Oscillator. Control EffectKinds (Scale Snap) transform Hertz on the path into an Oscillator. Audio EffectKinds (Distortion, Delay) transform the Oscillator audio before the mix. When Enable is off, the Effect passes the signal through unchanged.
 
 Wire is a plain edge between two canvas nodes in a Patch. It stores source and target node ids and optional handles. It does not store mapping data.
 
@@ -55,5 +55,9 @@ Do not put mapping parameters on React Flow edges. Mapping belongs on a Modulato
 Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with Elementary as the audio runtime. Waveform choices are `sine`, `square`, `saw`, and `noise`. Modulatable params are `frequencyHz` and `gain`.
 
 Scale Snap Effect defaults are tonic `C`, scale `major`, enabled on, and A4 at `440` Hz. Catalog scales are major, natural minor, major pentatonic, and minor pentatonic.
+
+Distortion Effect defaults are enabled on and Drive `2` (soft tanh clip on the audio path).
+
+Delay Effect defaults are enabled on, Time `250` ms, Feedback `0.35`, and Mix `0.35` (internal dry/wet on the audio path).
 
 A new Modulator starts with empty channel and target keys. Wiring a Connector fills the first modulatable Channel and its in-range hints when the current Channel is empty or missing on that kind. Wiring through to an Oscillator (Effects allowed in between) fills the first modulatable target param and its out-range the same way. Catalog `modulatorDefaults` still describe the USGS magnitude-to-frequency example ranges.

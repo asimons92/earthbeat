@@ -40,6 +40,7 @@ import { type ConnectorFlowNode } from '@/nodes/ConnectorNode';
 import { type EffectFlowNode } from '@/nodes/EffectNode';
 import { type ModulatorFlowNode } from '@/nodes/ModulatorNode';
 import { type OscillatorFlowNode } from '@/nodes/OscillatorNode';
+import { isValidPatchConnection } from './isValidPatchConnection';
 
 function nextOffset(count: number) {
   return { x: 60 + (count % 5) * 36, y: 60 + (count % 5) * 36 };
@@ -117,6 +118,7 @@ type PatchWorkspaceValue = {
   onNodesChange: (changes: Parameters<ReturnType<typeof useNodesState>[2]>[0]) => void;
   onEdgesChange: (changes: Parameters<ReturnType<typeof useEdgesState>[2]>[0]) => void;
   onConnect: OnConnect;
+  isValidConnection: (connection: Parameters<typeof isValidPatchConnection>[0]) => boolean;
   onSelectionChange: OnSelectionChangeFunc;
   onChangeNodeData: (nodeId: string, data: Record<string, unknown>) => void;
   addConnector: (kindKey: string) => boolean;
@@ -273,6 +275,12 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
     [setEdges, setNodes],
   );
 
+  const isValidConnection = useCallback(
+    (connection: Parameters<typeof isValidPatchConnection>[0]) =>
+      isValidPatchConnection(connection, nodes, edges),
+    [nodes, edges],
+  );
+
   const onSelectionChange = useCallback<OnSelectionChangeFunc>(({ nodes: selectedNodes }) => {
     setSelectedNodeId(selectedNodes[0]?.id ?? null);
   }, []);
@@ -383,6 +391,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       onNodesChange,
       onEdgesChange,
       onConnect,
+      isValidConnection,
       onSelectionChange,
       onChangeNodeData,
       addConnector,
@@ -423,6 +432,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       onNodesChange,
       onEdgesChange,
       onConnect,
+      isValidConnection,
       onSelectionChange,
       onChangeNodeData,
       addConnector,

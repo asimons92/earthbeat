@@ -31,6 +31,7 @@ export function CanvasPage() {
     onNodesChange,
     onEdgesChange,
     onConnect,
+    isValidConnection,
     onSelectionChange,
     onChangeNodeData,
     removeNode,
@@ -45,6 +46,7 @@ export function CanvasPage() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          isValidConnection={isValidConnection}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
           colorMode={themeMode}

@@ -1,6 +1,8 @@
 import { el, type ElemNode } from '@elemaudio/core';
 import WebRenderer from '@elemaudio/web-renderer';
 
+import { applyAudioFxChain } from './audioFxBake';
+import type { AudioFxStep } from './audioFxChain';
 import {
   buildOscillatorTone,
   OSCILLATOR_WAVEFORM_KEYS,
@@ -21,6 +23,8 @@ export type PatchAudioEngine = {
     initialFreqHz: number,
     initialGain: number,
     waveform?: string,
+    audioFxSteps?: AudioFxStep[],
+    audioFxFingerprint?: string,
   ) => Promise<VoiceControls>;
   setVoiceAudible: (oscillatorId: string, audible: boolean) => Promise<void>;
   removeVoice: (oscillatorId: string) => Promise<void>;
@@ -39,6 +43,7 @@ type VoiceState = {
   audible: boolean;
   tone: ElemNode;
   waveform: string;
+  fxFingerprint: string;
 };
 
 export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
@@ -81,6 +86,8 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     initialFreqHz: number,
     initialGain: number,
     waveform: string,
+    audioFxSteps: AudioFxStep[],
+    fxFingerprint: string,
   ): Promise<VoiceControls> {
     const resolvedWaveform = resolveOscillatorWaveform(waveform);
     const [freq, setFreqProps] = core.createRef('const', { value: initialFreqHz }, []) as [
@@ -91,7 +98,8 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
       ElemNode,
       (props: { value: number }) => Promise<void>,
     ];
-    const tone = el.mul(buildOscillatorTone(resolvedWaveform, freq), gain);
+    const dry = el.mul(buildOscillatorTone(resolvedWaveform, freq), gain);
+    const tone = applyAudioFxChain(dry, audioFxSteps, ctx.sampleRate);
 
     const controls: VoiceControls = {
       setFrequency: async (freqHz) => {
@@ -117,6 +125,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
       audible: true,
       tone,
       waveform: resolvedWaveform,
+      fxFingerprint,
     });
 
     await enqueueRebuild();
@@ -128,9 +137,16 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     initialFreqHz: number,
     initialGain: number,
     waveform: string = OSCILLATOR_WAVEFORM_KEYS[0],
+    audioFxSteps: AudioFxStep[] = [],
+    audioFxFingerprint: string = '',
   ): Promise<VoiceControls> {
     const existing = voices.get(oscillatorId);
-    const plan = planVoiceEnsure(existing?.waveform, waveform);
+    const plan = planVoiceEnsure(
+      existing?.waveform,
+      waveform,
+      existing?.fxFingerprint,
+      audioFxFingerprint,
+    );
 
     if (plan === 'reuse' && existing) {
       return existing.controls;
@@ -141,7 +157,14 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
       await enqueueRebuild();
     }
 
-    return createVoice(oscillatorId, initialFreqHz, initialGain, waveform);
+    return createVoice(
+      oscillatorId,
+      initialFreqHz,
+      initialGain,
+      waveform,
+      audioFxSteps,
+      audioFxFingerprint,
+    );
   }
 
   async function setVoiceAudible(oscillatorId: string, audible: boolean) {

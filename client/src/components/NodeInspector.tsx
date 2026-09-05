@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 import { Button } from '@/components/ui/button';
+import { effectStatusLine } from '@/catalog/buildEffectNode';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -44,12 +45,6 @@ function modulatorLabel(channelKey: string, targetParam: string) {
   const left = channel?.label ?? channelKey;
   const right = param?.label ?? targetParam;
   return `${left} → ${right}`;
-}
-
-function effectStatus(tonic: string, scaleKey: string, enabled: boolean) {
-  if (!enabled) return 'bypassed';
-  const scale = scaleSnapScales.find((entry) => entry.key === scaleKey);
-  return `${tonic} ${scale?.label ?? scaleKey}`;
 }
 
 function walkDownstreamOscillator(
@@ -350,13 +345,28 @@ export function NodeInspector({
       scaleKey: string;
       enabled: boolean;
       a4Hz: number;
+      drive: number;
+      timeMs: number;
+      feedback: number;
+      mix: number;
       status: string;
     };
     const kind = getEffectKind(data.kindKey);
+    const isAudio = (kind?.transforms ?? []).some((entry) => entry === 'audio');
+    const isDistortion = data.kindKey === 'distortion';
+    const isDelay = data.kindKey === 'delay';
 
     const patchEffect = (patch: Partial<typeof data>) => {
       const next = { ...data, ...patch };
-      next.status = effectStatus(next.tonic, next.scaleKey, next.enabled);
+      next.status = effectStatusLine({
+        kindKey: next.kindKey,
+        enabled: next.enabled,
+        tonic: next.tonic,
+        scaleKey: next.scaleKey,
+        drive: next.drive,
+        timeMs: next.timeMs,
+        feedback: next.feedback,
+      });
       onChangeNodeData(selected.id, next);
     };
 
@@ -377,49 +387,107 @@ export function NodeInspector({
               checked={data.enabled}
               onChange={(event) => patchEffect({ enabled: event.target.checked })}
             />
-            <span>Snap Hertz when on (bypass when off)</span>
+            <span>{isAudio ? 'Process audio when on (bypass when off)' : 'Snap Hertz when on (bypass when off)'}</span>
           </label>
         </div>
-        <div className="inspector__field">
-          <Label htmlFor="effect-tonic">Tonic</Label>
-          <Select
-            value={data.tonic}
-            onValueChange={(value) => {
-              if (value) patchEffect({ tonic: value });
-            }}
-          >
-            <SelectTrigger id="effect-tonic" size="sm">
-              <SelectValue placeholder="Tonic" />
-            </SelectTrigger>
-            <SelectContent>
-              {scaleSnapTonics.map((tonic) => (
-                <SelectItem key={tonic.key} value={tonic.key}>
-                  {tonic.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="inspector__field">
-          <Label htmlFor="effect-scale">Scale</Label>
-          <Select
-            value={data.scaleKey}
-            onValueChange={(value) => {
-              if (value) patchEffect({ scaleKey: value });
-            }}
-          >
-            <SelectTrigger id="effect-scale" size="sm">
-              <SelectValue placeholder="Scale" />
-            </SelectTrigger>
-            <SelectContent>
-              {scaleSnapScales.map((scale) => (
-                <SelectItem key={scale.key} value={scale.key}>
-                  {scale.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!isAudio ? (
+          <>
+            <div className="inspector__field">
+              <Label htmlFor="effect-tonic">Tonic</Label>
+              <Select
+                value={data.tonic}
+                onValueChange={(value) => {
+                  if (value) patchEffect({ tonic: value });
+                }}
+              >
+                <SelectTrigger id="effect-tonic" size="sm">
+                  <SelectValue placeholder="Tonic" />
+                </SelectTrigger>
+                <SelectContent>
+                  {scaleSnapTonics.map((tonic) => (
+                    <SelectItem key={tonic.key} value={tonic.key}>
+                      {tonic.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="inspector__field">
+              <Label htmlFor="effect-scale">Scale</Label>
+              <Select
+                value={data.scaleKey}
+                onValueChange={(value) => {
+                  if (value) patchEffect({ scaleKey: value });
+                }}
+              >
+                <SelectTrigger id="effect-scale" size="sm">
+                  <SelectValue placeholder="Scale" />
+                </SelectTrigger>
+                <SelectContent>
+                  {scaleSnapScales.map((scale) => (
+                    <SelectItem key={scale.key} value={scale.key}>
+                      {scale.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        ) : null}
+        {isDistortion ? (
+          <div className="inspector__field">
+            <Label htmlFor="effect-drive">Drive</Label>
+            <Input
+              id="effect-drive"
+              type="number"
+              min={1}
+              max={20}
+              step={0.1}
+              value={data.drive}
+              onChange={(event) => patchEffect({ drive: Number(event.target.value) })}
+            />
+          </div>
+        ) : null}
+        {isDelay ? (
+          <>
+            <div className="inspector__field">
+              <Label htmlFor="effect-time-ms">Time (ms)</Label>
+              <Input
+                id="effect-time-ms"
+                type="number"
+                min={20}
+                max={1000}
+                step={1}
+                value={data.timeMs}
+                onChange={(event) => patchEffect({ timeMs: Number(event.target.value) })}
+              />
+            </div>
+            <div className="inspector__field">
+              <Label htmlFor="effect-feedback">Feedback</Label>
+              <Input
+                id="effect-feedback"
+                type="number"
+                min={0}
+                max={0.95}
+                step={0.01}
+                value={data.feedback}
+                onChange={(event) => patchEffect({ feedback: Number(event.target.value) })}
+              />
+            </div>
+            <div className="inspector__field">
+              <Label htmlFor="effect-mix">Mix</Label>
+              <Input
+                id="effect-mix"
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={data.mix}
+                onChange={(event) => patchEffect({ mix: Number(event.target.value) })}
+              />
+            </div>
+          </>
+        ) : null}
         <RemoveControl nodeId={selected.id} onRemoveNode={onRemoveNode} />
       </aside>
     );

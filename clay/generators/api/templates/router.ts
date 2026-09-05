@@ -76,12 +76,27 @@ const oscillatorSchema = graphNodeBase.extend({
   gain: z.number(),
 });
 
+<%
+  const effectType = (types || []).find((entry) => entry.name === 'Effect');
+  const graphBaseFieldNames = new Set(['id', 'patchId', 'label', 'positionX', 'positionY']);
+  function zodForField(field) {
+    let zod = 'z.unknown()';
+    if (field.type === 'string') zod = 'z.string()';
+    else if (field.type === 'number') zod = 'z.number()';
+    else if (field.type === 'boolean') zod = 'z.boolean()';
+    else if (field.type === 'timestamp') zod = 'z.string()';
+    else if (field.type === 'json' || field.type === 'array') zod = 'z.unknown()';
+    if (!field.required) zod += '.optional()';
+    return zod;
+  }
+  const effectExtraFields = ((effectType && effectType.fields) || []).filter(
+    (field) => !graphBaseFieldNames.has(field.name),
+  );
+%>
 const effectSchema = graphNodeBase.extend({
-  kindKey: z.string(),
-  tonic: z.string(),
-  scaleKey: z.string(),
-  enabled: z.boolean(),
-  a4Hz: z.number(),
+<% effectExtraFields.forEach((field) => { %>
+  <%= field.name %>: <%= zodForField(field) %>,
+<% }); %>
 });
 
 const wireSchema = z.object({

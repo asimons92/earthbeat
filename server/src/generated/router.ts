@@ -76,12 +76,27 @@ const oscillatorSchema = graphNodeBase.extend({
   gain: z.number(),
 });
 
+
 const effectSchema = graphNodeBase.extend({
+
   kindKey: z.string(),
+
   tonic: z.string(),
+
   scaleKey: z.string(),
+
   enabled: z.boolean(),
+
   a4Hz: z.number(),
+
+  drive: z.number(),
+
+  timeMs: z.number(),
+
+  feedback: z.number(),
+
+  mix: z.number(),
+
 });
 
 const wireSchema = z.object({

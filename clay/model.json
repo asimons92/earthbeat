@@ -247,6 +247,24 @@
           "defaultScaleKey": "major",
           "defaultEnabled": true,
           "a4Hz": 440
+        },
+        {
+          "key": "distortion",
+          "label": "Distortion",
+          "description": "Soft-clip saturation on the Oscillator audio path (tanh drive).",
+          "transforms": ["audio"],
+          "defaultEnabled": true,
+          "defaultDrive": 2
+        },
+        {
+          "key": "delay",
+          "label": "Delay",
+          "description": "Feedback echo on the Oscillator audio path.",
+          "transforms": ["audio"],
+          "defaultEnabled": true,
+          "defaultTimeMs": 250,
+          "defaultFeedback": 0.35,
+          "defaultMix": 0.35
         }
       ],
       "scaleSnapTonics": [
@@ -290,7 +308,11 @@
         "tonic": "C",
         "scaleKey": "major",
         "enabled": true,
-        "a4Hz": 440
+        "a4Hz": 440,
+        "drive": 2,
+        "timeMs": 250,
+        "feedback": 0.35,
+        "mix": 0.35
       }
     },
     "types": [
@@ -910,7 +932,7 @@
       {
         "name": "EffectKind",
         "persist": false,
-        "description": "Catalog entry for an Effect kind. scale_snap snaps frequencyHz to a tonic and named scale.",
+        "description": "Catalog entry for an Effect kind. Control kinds transform frequencyHz into an Oscillator. Audio kinds transform Oscillator audio before the mix.",
         "fields": [
           {
             "name": "key",
@@ -935,7 +957,7 @@
       },
       {
         "name": "Effect",
-        "description": "Canvas node: post-map transform on the path into an Oscillator. MVP kind is scale_snap (tonic + scale → nearest Hertz).",
+        "description": "Canvas node: control transform into an Oscillator (scale_snap) or audio transform after an Oscillator (distortion, delay).",
         "fields": [
           {
             "name": "id",
@@ -987,7 +1009,7 @@
             "type": "boolean",
             "required": true,
             "default": true,
-            "description": "Pedal-style bypass. When false, Hertz passes through unchanged."
+            "description": "Pedal-style bypass. When false, the Effect passes the signal through unchanged."
           },
           {
             "name": "a4Hz",
@@ -995,6 +1017,34 @@
             "required": true,
             "default": 440,
             "description": "Equal-temperament A4 reference in Hertz."
+          },
+          {
+            "name": "drive",
+            "type": "number",
+            "required": true,
+            "default": 2,
+            "description": "Distortion drive into tanh soft clip."
+          },
+          {
+            "name": "timeMs",
+            "type": "number",
+            "required": true,
+            "default": 250,
+            "description": "Delay time in milliseconds."
+          },
+          {
+            "name": "feedback",
+            "type": "number",
+            "required": true,
+            "default": 0.35,
+            "description": "Delay feedback coefficient."
+          },
+          {
+            "name": "mix",
+            "type": "number",
+            "required": true,
+            "default": 0.35,
+            "description": "Delay wet mix amount on the range 0 to 1."
           }
         ],
         "commands": [
@@ -1039,6 +1089,22 @@
               },
               {
                 "name": "a4Hz",
+                "type": "number"
+              },
+              {
+                "name": "drive",
+                "type": "number"
+              },
+              {
+                "name": "timeMs",
+                "type": "number"
+              },
+              {
+                "name": "feedback",
+                "type": "number"
+              },
+              {
+                "name": "mix",
                 "type": "number"
               }
             ]
@@ -1085,6 +1151,22 @@
               },
               {
                 "name": "a4Hz",
+                "type": "number"
+              },
+              {
+                "name": "drive",
+                "type": "number"
+              },
+              {
+                "name": "timeMs",
+                "type": "number"
+              },
+              {
+                "name": "feedback",
+                "type": "number"
+              },
+              {
+                "name": "mix",
                 "type": "number"
               },
               {

@@ -7,6 +7,10 @@ export type EffectNodeData = {
   scaleKey: string;
   enabled: boolean;
   a4Hz: number;
+  drive: number;
+  timeMs: number;
+  feedback: number;
+  mix: number;
   status: string;
 };
 

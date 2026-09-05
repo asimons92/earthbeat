@@ -67,6 +67,10 @@ const graphArb: fc.Arbitrary<DomainGraph> = fc
         scaleKey: 'major',
         enabled: true,
         a4Hz: 440,
+        drive: 2,
+        timeMs: 250,
+        feedback: 0.35,
+        mix: 0.35,
       }));
       const wirePairs: Array<{ source: string; target: string }> = [];
       const c0 = connectorIds[0];

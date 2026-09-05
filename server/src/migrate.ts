@@ -86,8 +86,24 @@ export async function ensureSchema(): Promise<void> {
       tonic text NOT NULL,
       scale_key text NOT NULL,
       enabled boolean NOT NULL,
-      a4_hz double precision NOT NULL
+      a4_hz double precision NOT NULL,
+      drive double precision NOT NULL DEFAULT 2,
+      time_ms double precision NOT NULL DEFAULT 250,
+      feedback double precision NOT NULL DEFAULT 0.35,
+      mix double precision NOT NULL DEFAULT 0.35
     );
+  `);
+  await db.execute(sql`
+    ALTER TABLE effects ADD COLUMN IF NOT EXISTS drive double precision NOT NULL DEFAULT 2;
+  `);
+  await db.execute(sql`
+    ALTER TABLE effects ADD COLUMN IF NOT EXISTS time_ms double precision NOT NULL DEFAULT 250;
+  `);
+  await db.execute(sql`
+    ALTER TABLE effects ADD COLUMN IF NOT EXISTS feedback double precision NOT NULL DEFAULT 0.35;
+  `);
+  await db.execute(sql`
+    ALTER TABLE effects ADD COLUMN IF NOT EXISTS mix double precision NOT NULL DEFAULT 0.35;
   `);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS wires (

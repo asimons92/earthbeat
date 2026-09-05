@@ -27,17 +27,22 @@ export type VoiceEnsurePlan = 'create' | 'reuse' | 'rebuild';
 
 /**
  * Decide whether ensureVoice can keep the existing Elementary voice or must rebuild.
- * Compares resolved waveform keys only.
+ * Compares resolved waveform keys and optional audio FX fingerprints.
  */
 export function planVoiceEnsure(
   existingWaveform: string | undefined,
   requestedWaveform: string,
+  existingFxFingerprint: string = '',
+  requestedFxFingerprint: string = '',
 ): VoiceEnsurePlan {
   const next = resolveOscillatorWaveform(requestedWaveform);
   if (existingWaveform === undefined) {
     return 'create';
   }
-  if (resolveOscillatorWaveform(existingWaveform) === next) {
+  if (
+    resolveOscillatorWaveform(existingWaveform) === next &&
+    existingFxFingerprint === requestedFxFingerprint
+  ) {
     return 'reuse';
   }
   return 'rebuild';

@@ -4,6 +4,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { oscillatorDefaults } from '@/generated/catalog';
 
 import { createPatchAudioEngine, type PatchAudioEngine } from './audioEngine';
+import { audioFxFingerprint, resolveOutboundAudioFxChain } from './audioFxChain';
 import {
   createPatchTransportState,
   reducePatchTransport,
@@ -119,7 +120,17 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
       const waveform =
         typeof osc?.data.waveform === 'string' ? osc.data.waveform : oscillatorDefaults.waveform;
       if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) continue;
-      const voice = await engine.ensureVoice(oscillatorId, restingFreq, restingGain, waveform);
+      const fxChain = resolveOutboundAudioFxChain(runtimeNodes, runtimeEdges, oscillatorId);
+      const fxSteps = fxChain.ok ? fxChain.steps : [];
+      const fxFp = audioFxFingerprint(fxSteps);
+      const voice = await engine.ensureVoice(
+        oscillatorId,
+        restingFreq,
+        restingGain,
+        waveform,
+        fxSteps,
+        fxFp,
+      );
       if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) {
         await engine.removeVoice(oscillatorId);
         continue;

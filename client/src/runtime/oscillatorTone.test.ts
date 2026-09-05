@@ -123,4 +123,19 @@ describe('planVoiceEnsure', () => {
       }),
     );
   });
+
+  it('rebuilds when the audio FX fingerprint changes with the same waveform', () => {
+    fc.assert(
+      fc.property(
+        waveformKeyArb,
+        fc.string({ minLength: 1, maxLength: 32 }),
+        fc.string({ minLength: 1, maxLength: 32 }),
+        (waveform, fpA, fpB) => {
+          fc.pre(fpA !== fpB);
+          expect(planVoiceEnsure(waveform, waveform, fpA, fpB)).toBe(rebuildPlan);
+          expect(planVoiceEnsure(waveform, waveform, fpA, fpA)).toBe(reusePlan);
+        },
+      ),
+    );
+  });
 });

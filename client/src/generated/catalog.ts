@@ -140,12 +140,38 @@ export const effectKinds = [
     "defaultScaleKey": "major",
     "defaultEnabled": true,
     "a4Hz": 440
+  },
+  {
+    "key": "distortion",
+    "label": "Distortion",
+    "description": "Soft-clip saturation on the Oscillator audio path (tanh drive).",
+    "transforms": [
+      "audio"
+    ],
+    "defaultEnabled": true,
+    "defaultDrive": 2
+  },
+  {
+    "key": "delay",
+    "label": "Delay",
+    "description": "Feedback echo on the Oscillator audio path.",
+    "transforms": [
+      "audio"
+    ],
+    "defaultEnabled": true,
+    "defaultTimeMs": 250,
+    "defaultFeedback": 0.35,
+    "defaultMix": 0.35
   }
 ] as const;
 
 export const effectKindsByKey = {
 
   'scale_snap': effectKinds[0],
+
+  'distortion': effectKinds[1],
+
+  'delay': effectKinds[2],
 
 } as const;
 
@@ -258,7 +284,11 @@ export const effectDefaults = {
   "tonic": "C",
   "scaleKey": "major",
   "enabled": true,
-  "a4Hz": 440
+  "a4Hz": 440,
+  "drive": 2,
+  "timeMs": 250,
+  "feedback": 0.35,
+  "mix": 0.35
 } as const;
 
 export const oscillatorDefaults = {

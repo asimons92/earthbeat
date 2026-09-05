@@ -127,6 +127,14 @@ export const effects = pgTable('effects', {
 
   a4Hz: doublePrecision('a4_hz').notNull(),
 
+  drive: doublePrecision('drive').notNull(),
+
+  timeMs: doublePrecision('time_ms').notNull(),
+
+  feedback: doublePrecision('feedback').notNull(),
+
+  mix: doublePrecision('mix').notNull(),
+
 });
 
 

@@ -135,6 +135,14 @@ export type Effect = {
 
   a4Hz: number;
 
+  drive: number;
+
+  timeMs: number;
+
+  feedback: number;
+
+  mix: number;
+
 };
 
 

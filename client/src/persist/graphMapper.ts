@@ -1,5 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { effectStatusLine } from '@/catalog/buildEffectNode';
+
 export type DomainConnector = {
   id: string;
   patchId: string;
@@ -55,6 +57,10 @@ export type DomainEffect = {
   scaleKey: string;
   enabled: boolean;
   a4Hz: number;
+  drive: number;
+  timeMs: number;
+  feedback: number;
+  mix: number;
 };
 
 export type DomainWire = {
@@ -134,6 +140,10 @@ export function flowToDomainGraph(patchId: string, nodes: Node[], edges: Edge[])
         scaleKey: String(data.scaleKey ?? 'major'),
         enabled: typeof data.enabled === 'boolean' ? data.enabled : true,
         a4Hz: typeof data.a4Hz === 'number' ? data.a4Hz : 440,
+        drive: typeof data.drive === 'number' ? data.drive : 2,
+        timeMs: typeof data.timeMs === 'number' ? data.timeMs : 250,
+        feedback: typeof data.feedback === 'number' ? data.feedback : 0.35,
+        mix: typeof data.mix === 'number' ? data.mix : 0.35,
       });
     }
   }
@@ -195,20 +205,38 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
         status: `${row.frequencyHz} Hz`,
       },
     })),
-    ...(graph.effects ?? []).map((row) => ({
-      id: row.id,
-      type: 'effect' as const,
-      position: { x: row.positionX, y: row.positionY },
-      data: {
-        label: row.label ?? 'Scale Snap',
-        kindKey: row.kindKey,
-        tonic: row.tonic,
-        scaleKey: row.scaleKey,
-        enabled: row.enabled,
-        a4Hz: row.a4Hz,
-        status: row.enabled ? `${row.tonic} ${row.scaleKey}` : 'bypassed',
-      },
-    })),
+    ...(graph.effects ?? []).map((row) => {
+      const drive = typeof row.drive === 'number' ? row.drive : 2;
+      const timeMs = typeof row.timeMs === 'number' ? row.timeMs : 250;
+      const feedback = typeof row.feedback === 'number' ? row.feedback : 0.35;
+      const mix = typeof row.mix === 'number' ? row.mix : 0.35;
+      return {
+        id: row.id,
+        type: 'effect' as const,
+        position: { x: row.positionX, y: row.positionY },
+        data: {
+          label: row.label ?? row.kindKey,
+          kindKey: row.kindKey,
+          tonic: row.tonic,
+          scaleKey: row.scaleKey,
+          enabled: row.enabled,
+          a4Hz: row.a4Hz,
+          drive,
+          timeMs,
+          feedback,
+          mix,
+          status: effectStatusLine({
+            kindKey: row.kindKey,
+            enabled: row.enabled,
+            tonic: row.tonic,
+            scaleKey: row.scaleKey,
+            drive,
+            timeMs,
+            feedback,
+          }),
+        },
+      };
+    }),
   ];
 
   const edges: Edge[] = graph.wires.map((wire) => ({
