@@ -48,7 +48,7 @@ select {
 
 .shell {
   display: grid;
-  grid-template-rows: 56px minmax(0, 1fr) 120px 52px;
+  grid-template-rows: 56px minmax(0, 1fr) minmax(0, 120px) 52px;
   height: 100%;
   background: var(--bg);
 }
@@ -361,9 +361,17 @@ select {
   grid-template-columns: 160px minmax(0, 1fr) 72px;
   align-items: center;
   gap: 1rem;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   padding: 0.75rem 1.25rem;
   border-top: 1px solid var(--line);
   background: var(--bg-panel);
+}
+
+.monitor__meta {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .monitor__title {
@@ -383,9 +391,17 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
+.monitor__readout > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .monitor__wave {
   width: 100%;
   height: 72px;
+  min-width: 0;
   color: var(--ink);
   opacity: 0.85;
 }
@@ -395,6 +411,7 @@ select {
   color: var(--ink-muted);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .shell__footer {
@@ -431,7 +448,7 @@ select {
 
 @media (width <= 720px) {
   .shell {
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto minmax(0, 1fr) minmax(0, 120px) auto;
   }
 
   .shell__header {
@@ -458,12 +475,19 @@ select {
   }
 
   .shell__monitor {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 72px;
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 0.5rem;
   }
 
+  .monitor__wave {
+    grid-column: 1 / -1;
+    height: 40px;
+  }
+
   .monitor__time {
-    justify-self: start;
+    justify-self: end;
+    align-self: start;
   }
 }
 
