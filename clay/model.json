@@ -1,34 +1,159 @@
 {
   "name": "earthbeat",
   "generators": [
-    "./generators/api"
+    "./generators/ui-catalog"
   ],
   "model": {
     "catalog": {
+      "shell": {
+        "createActions": [
+          {
+            "key": "addConnector",
+            "label": "New connector",
+            "nodeType": "connector"
+          },
+          {
+            "key": "addModulator",
+            "label": "New modulator",
+            "nodeType": "modulator"
+          },
+          {
+            "key": "addOscillator",
+            "label": "New oscillator",
+            "nodeType": "oscillator"
+          }
+        ],
+        "paletteCategories": [
+          {
+            "key": "seismic",
+            "label": "Seismic",
+            "icon": "∿"
+          },
+          {
+            "key": "weather",
+            "label": "Weather",
+            "icon": "☁"
+          },
+          {
+            "key": "tides",
+            "label": "Tides",
+            "icon": "≋"
+          },
+          {
+            "key": "transform",
+            "label": "Transform",
+            "icon": "∼"
+          },
+          {
+            "key": "mix",
+            "label": "Mix",
+            "icon": "▥"
+          },
+          {
+            "key": "output",
+            "label": "Output",
+            "icon": "♪"
+          }
+        ],
+        "patchTabs": [
+          {
+            "key": "pacific",
+            "name": "Pacific Quake Patch",
+            "active": true
+          },
+          {
+            "key": "winds",
+            "name": "Coastal Winds",
+            "active": false
+          },
+          {
+            "key": "tidal",
+            "name": "Tidal Pulse",
+            "active": false
+          },
+          {
+            "key": "storm",
+            "name": "Storm Rhythm",
+            "active": false
+          }
+        ]
+      },
       "connectorKinds": [
         {
           "key": "usgs_earthquakes",
           "label": "USGS Quakes",
-          "description": "USGS all-day earthquake feed",
+          "description": "USGS GeoJSON summary feed (all_day by default). Same source as earthbeat v1.",
+          "feedUrl": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson",
+          "defaultPollIntervalMs": 60000,
+          "defaultPlaybackHz": 4,
           "channels": [
             {
               "key": "mag",
               "label": "Magnitude",
-              "unit": "Mw",
-              "min": 1,
-              "max": 8
+              "unit": "magnitude",
+              "valueType": "number",
+              "source": "properties.mag",
+              "modulatable": true,
+              "min": 0,
+              "max": 10,
+              "mapHintMin": 1,
+              "mapHintMax": 8
+            },
+            {
+              "key": "depthKm",
+              "label": "Depth",
+              "unit": "km",
+              "valueType": "number",
+              "source": "geometry.coordinates[2]",
+              "modulatable": true,
+              "min": 0,
+              "max": 700
+            },
+            {
+              "key": "sig",
+              "label": "Significance",
+              "unit": "sig",
+              "valueType": "number",
+              "source": "properties.sig",
+              "modulatable": true,
+              "min": 0,
+              "max": 1000
+            },
+            {
+              "key": "place",
+              "label": "Place",
+              "valueType": "string",
+              "source": "properties.place",
+              "modulatable": false
+            },
+            {
+              "key": "time",
+              "label": "Event time",
+              "valueType": "timestamp",
+              "source": "properties.time",
+              "modulatable": false,
+              "description": "Unix time in milliseconds"
+            },
+            {
+              "key": "eventId",
+              "label": "Event id",
+              "valueType": "string",
+              "source": "id",
+              "modulatable": false
             }
           ]
         }
       ],
       "oscillatorDefaults": {
         "waveform": "sine",
-        "baseFrequencyHz": 220,
-        "gain": 0.2
+        "frequencyHz": 220,
+        "gain": 0.2,
+        "runtime": "elemaudio",
+        "notes": "Matches earthbeat v1 Elementary WebRenderer sine (el.phasor + el.sin)."
       },
       "modulatorDefaults": {
         "channelKey": "mag",
-        "targetParam": "frequency",
+        "targetParam": "frequencyHz",
         "inMin": 1,
         "inMax": 8,
         "outMin": 110,
@@ -179,7 +304,7 @@
       },
       {
         "name": "ConnectorKind",
-        "description": "Catalog entry for a natural-signal API kind. Instances on the canvas are Connector nodes.",
+        "description": "Catalog entry for a natural-signal API kind. usgs_earthquakes channels mirror USGS GeoJSON summary fields used for sonification and display.",
         "fields": [
           {
             "name": "key",
@@ -257,7 +382,7 @@
       },
       {
         "name": "Connector",
-        "description": "Canvas node: an instance of a ConnectorKind inside a Patch.",
+        "description": "Canvas node: live instance of a ConnectorKind. For usgs_earthquakes, config holds feed URL and poll/playback rates from earthbeat v1 stream options.",
         "fields": [
           {
             "name": "id",
@@ -289,6 +414,23 @@
             "name": "positionY",
             "type": "number",
             "required": true
+          },
+          {
+            "name": "feedUrl",
+            "type": "string",
+            "description": "USGS GeoJSON feed URL. Default is the ConnectorKind feedUrl (all_day)."
+          },
+          {
+            "name": "pollIntervalMs",
+            "type": "number",
+            "default": 60000,
+            "description": "How often to refetch the USGS feed."
+          },
+          {
+            "name": "playbackHz",
+            "type": "number",
+            "default": 4,
+            "description": "How many queued samples to emit per second (earthbeat v1 EarthquakeStream hz)."
           },
           {
             "name": "config",
@@ -326,6 +468,20 @@
               {
                 "name": "config",
                 "type": "json"
+              },
+              {
+                "name": "feedUrl",
+                "type": "string"
+              },
+              {
+                "name": "pollIntervalMs",
+                "type": "number",
+                "default": 60000
+              },
+              {
+                "name": "playbackHz",
+                "type": "number",
+                "default": 4
               }
             ]
           },
@@ -378,7 +534,7 @@
       },
       {
         "name": "Oscillator",
-        "description": "Canvas node: sound generator. Incoming control values usually come through a Modulator.",
+        "description": "Canvas node: sound generator via Elementary (@elemaudio/core + web-renderer). MVP waveform is sine only (phasor driven by frequencyHz).",
         "fields": [
           {
             "name": "id",
@@ -408,17 +564,33 @@
           {
             "name": "waveform",
             "type": "string",
-            "required": true
+            "required": true,
+            "enum": [
+              "sine"
+            ],
+            "description": "Tone shape. Only sine is implemented in the Elementary graph for now."
           },
           {
-            "name": "baseFrequencyHz",
+            "name": "frequencyHz",
             "type": "number",
-            "required": true
+            "required": true,
+            "modulatable": true,
+            "label": "Frequency (Hz)",
+            "min": 20,
+            "max": 2000,
+            "default": 220,
+            "description": "Oscillator frequency in Hz. Drives el.phasor in the Elementary graph."
           },
           {
             "name": "gain",
             "type": "number",
-            "required": true
+            "required": true,
+            "modulatable": true,
+            "label": "Gain",
+            "min": 0,
+            "max": 1,
+            "default": 0.2,
+            "description": "Output amplitude scale (0 to 1)."
           }
         ],
         "commands": [
@@ -445,7 +617,7 @@
                 "type": "string"
               },
               {
-                "name": "baseFrequencyHz",
+                "name": "frequencyHz",
                 "type": "number"
               },
               {
@@ -491,7 +663,7 @@
                 "type": "string"
               },
               {
-                "name": "baseFrequencyHz",
+                "name": "frequencyHz",
                 "type": "number"
               },
               {
@@ -553,7 +725,8 @@
           {
             "name": "targetParam",
             "type": "string",
-            "required": true
+            "required": true,
+            "description": "Modulatable Oscillator field key, for example frequencyHz or gain."
           },
           {
             "name": "inMin",

@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "oxlint && stylelint \"src/**/*.css\" && node scripts/check-ui-colors.mjs && node scripts/check-test-invariants.mjs",
+    "lint": "oxlint && stylelint \"src/**/*.css\" && node scripts/check-ui-colors.mjs && node scripts/check-test-invariants.mjs && node scripts/check-model-driven-ui.mjs",
+    "lint:model-ui": "node scripts/check-model-driven-ui.mjs",
     "lint:colors": "stylelint \"src/**/*.css\" && node scripts/check-ui-colors.mjs",
     "lint:tests": "node scripts/check-test-invariants.mjs",
     "preview": "vite preview"

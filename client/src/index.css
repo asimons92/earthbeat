@@ -131,7 +131,7 @@ select {
 
 .shell__body {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 88px minmax(0, 1fr) 260px;
   min-height: 0;
 }
 
@@ -170,6 +170,60 @@ select {
 .shell__canvas {
   min-height: 0;
   background: var(--bg);
+}
+
+.shell__inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  padding: 0.85rem 0.9rem;
+  overflow: auto;
+  border-left: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+.inspector__title {
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inspector__hint {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.inspector__empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+}
+
+.inspector__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inspector__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.inspector__readonly {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.inspector__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
 }
 
 .shell__canvas .react-flow {
@@ -325,6 +379,13 @@ select {
 
   .shell__body {
     grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .shell__inspector {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    max-height: 40vh;
   }
 
   .shell__monitor {

@@ -30,6 +30,18 @@ Earthbeat uses Clay for model-driven generation. The domain model and generators
 
 Cursor also loads `.cursor/rules/clay-mdd.mdc` for the same Clay rules.
 
+## Model-driven UI
+
+Dropdowns, create-nav labels, palette categories, and similar option lists must come from Clay, not from hand-written arrays in React.
+
+1. Define lists in `clay/model.json` (`catalog.shell`, connector kinds, modulatable Oscillator fields, and related catalog seeds).
+2. Run `clay generate` so Clay writes `client/src/generated/catalog.ts` (and other generated modules).
+3. Import only from `@/generated/catalog` (or other paths under `client/src/generated/`).
+4. Do not maintain a parallel hand-written `catalog.ts`.
+5. `pnpm --dir client lint` runs `scripts/check-model-driven-ui.mjs`, which bans hand-rolled option arrays and non-generated catalog imports outside `client/src/generated/`.
+
+Cursor also loads `.cursor/rules/model-driven-ui.mdc` for the same policy.
+
 ## App shell
 
 The Vite React client lives in `client/`. From the repo root, run `pnpm dev` to start it. Play and LIVE controls are stubs until the runtime milestone.

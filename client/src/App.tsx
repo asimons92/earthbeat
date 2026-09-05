@@ -1,37 +1,32 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
   ReactFlow,
+  addEdge,
   useEdgesState,
   useNodesState,
   type Edge,
   type Node,
   type NodeTypes,
+  type OnConnect,
+  type OnSelectionChangeFunc,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import { NodeInspector } from '@/components/NodeInspector';
 import { Button } from '@/components/ui/button';
-import { modulatorDefaults, oscillatorDefaults, usgsConnector } from './catalog';
+import {
+  modulatorDefaults,
+  oscillatorDefaults,
+  shellCreateActions,
+  shellPaletteCategories,
+  shellPatchTabs,
+  usgsConnector,
+} from '@/generated/catalog';
 import { ConnectorNode, type ConnectorFlowNode } from './nodes/ConnectorNode';
 import { ModulatorNode, type ModulatorFlowNode } from './nodes/ModulatorNode';
 import { OscillatorNode, type OscillatorFlowNode } from './nodes/OscillatorNode';
-
-const SIDEBAR_ITEMS = [
-  { id: 'seismic', label: 'Seismic', icon: '∿' },
-  { id: 'weather', label: 'Weather', icon: '☁' },
-  { id: 'tides', label: 'Tides', icon: '≋' },
-  { id: 'transform', label: 'Transform', icon: '∼' },
-  { id: 'mix', label: 'Mix', icon: '▥' },
-  { id: 'output', label: 'Output', icon: '♪' },
-] as const;
-
-const PATCH_TABS = [
-  { id: 'pacific', name: 'Pacific Quake Patch', active: true },
-  { id: 'winds', name: 'Coastal Winds', active: false },
-  { id: 'tidal', name: 'Tidal Pulse', active: false },
-  { id: 'storm', name: 'Storm Rhythm', active: false },
-] as const;
 
 const nodeTypes = {
   connector: ConnectorNode,
@@ -55,9 +50,13 @@ const initialNodes: Node[] = [
     type: 'modulator',
     position: { x: 280, y: 140 },
     data: {
-      label: 'Magnitude → Hz',
+      label: 'Magnitude → Frequency (Hz)',
       channelKey: modulatorDefaults.channelKey,
       targetParam: modulatorDefaults.targetParam,
+      inMin: modulatorDefaults.inMin,
+      inMax: modulatorDefaults.inMax,
+      outMin: modulatorDefaults.outMin,
+      outMax: modulatorDefaults.outMax,
       status: `${modulatorDefaults.inMin}–${modulatorDefaults.inMax} → ${modulatorDefaults.outMin}–${modulatorDefaults.outMax}`,
     },
   },
@@ -68,7 +67,9 @@ const initialNodes: Node[] = [
     data: {
       label: 'Sine Tone',
       waveform: oscillatorDefaults.waveform,
-      status: `${oscillatorDefaults.baseFrequencyHz} Hz`,
+      frequencyHz: oscillatorDefaults.frequencyHz,
+      gain: oscillatorDefaults.gain,
+      status: `${oscillatorDefaults.frequencyHz} Hz`,
     },
   },
 ];
@@ -100,14 +101,35 @@ function noopTransport() {
 
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const activePatch = useMemo(
-    () => PATCH_TABS.find((tab) => tab.active)?.name ?? 'Untitled Patch',
+    () => shellPatchTabs.find((tab) => tab.active)?.name ?? 'Untitled Patch',
     [],
   );
 
   const onPlay = useCallback(() => noopTransport(), []);
   const onStop = useCallback(() => noopTransport(), []);
+
+  const onConnect = useCallback<OnConnect>(
+    (connection) => {
+      setEdges((current) => addEdge(connection, current));
+    },
+    [setEdges],
+  );
+
+  const onSelectionChange = useCallback<OnSelectionChangeFunc>(({ nodes: selectedNodes }) => {
+    setSelectedNodeId(selectedNodes[0]?.id ?? null);
+  }, []);
+
+  const onChangeNodeData = useCallback(
+    (nodeId: string, data: Record<string, unknown>) => {
+      setNodes((current) =>
+        current.map((node) => (node.id === nodeId ? { ...node, data } : node)),
+      );
+    },
+    [setNodes],
+  );
 
   const addOscillator = useCallback(() => {
     setNodes((current) => {
@@ -120,7 +142,9 @@ export default function App() {
         data: {
           label: index === 0 ? 'Sine Tone' : `Sine Tone ${index + 1}`,
           waveform: oscillatorDefaults.waveform,
-          status: `${oscillatorDefaults.baseFrequencyHz} Hz`,
+          frequencyHz: oscillatorDefaults.frequencyHz,
+          gain: oscillatorDefaults.gain,
+          status: `${oscillatorDefaults.frequencyHz} Hz`,
         },
       };
       return [...current, node];
@@ -136,9 +160,13 @@ export default function App() {
         type: 'modulator',
         position,
         data: {
-          label: index === 0 ? 'Magnitude → Hz' : `Magnitude → Hz ${index + 1}`,
+          label: index === 0 ? 'Magnitude → Frequency (Hz)' : `Modulator ${index + 1}`,
           channelKey: modulatorDefaults.channelKey,
           targetParam: modulatorDefaults.targetParam,
+          inMin: modulatorDefaults.inMin,
+          inMax: modulatorDefaults.inMax,
+          outMin: modulatorDefaults.outMin,
+          outMax: modulatorDefaults.outMax,
           status: `${modulatorDefaults.inMin}–${modulatorDefaults.inMax} → ${modulatorDefaults.outMin}–${modulatorDefaults.outMax}`,
         },
       };
@@ -169,21 +197,31 @@ export default function App() {
       <header className="shell__header">
         <div className="shell__brand">EARTHBEAT</div>
         <div className="shell__create">
-          <Button type="button" variant="outline" size="sm" onClick={addConnector}>
-            New connector
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={addModulator}>
-            New modulator
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={addOscillator}>
-            New oscillator
-          </Button>
+          {shellCreateActions.map((action) => {
+            const onClick =
+              action.nodeType === 'connector'
+                ? addConnector
+                : action.nodeType === 'modulator'
+                  ? addModulator
+                  : addOscillator;
+            return (
+              <Button
+                key={action.key}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onClick}
+              >
+                {action.label}
+              </Button>
+            );
+          })}
         </div>
         <label className="shell__patch-select">
           <span className="visually-hidden">Active patch</span>
           <select defaultValue={activePatch} aria-label="Active patch">
-            {PATCH_TABS.map((tab) => (
-              <option key={tab.id} value={tab.name}>
+            {shellPatchTabs.map((tab) => (
+              <option key={tab.key} value={tab.name}>
                 {tab.name}
               </option>
             ))}
@@ -205,8 +243,8 @@ export default function App() {
 
       <div className="shell__body">
         <aside className="shell__sidebar" aria-label="Node categories">
-          {SIDEBAR_ITEMS.map((item) => (
-            <div key={item.id} className="sidebar-item" title="Palette actions come later">
+          {shellPaletteCategories.map((item) => (
+            <div key={item.key} className="sidebar-item" title="Palette actions come later">
               <span className="sidebar-item__icon" aria-hidden>
                 {item.icon}
               </span>
@@ -221,6 +259,8 @@ export default function App() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onSelectionChange={onSelectionChange}
             nodeTypes={nodeTypes}
             fitView
             proOptions={{ hideAttribution: true }}
@@ -237,13 +277,20 @@ export default function App() {
             />
           </ReactFlow>
         </main>
+
+        <NodeInspector
+          nodes={nodes}
+          edges={edges}
+          selectedNodeId={selectedNodeId}
+          onChangeNodeData={onChangeNodeData}
+        />
       </div>
 
       <section className="shell__monitor" aria-label="Output monitor">
         <div className="monitor__meta">
           <div className="monitor__title">Output monitor</div>
           <div className="monitor__readout">
-            <span>{oscillatorDefaults.baseFrequencyHz} Hz</span>
+            <span>{oscillatorDefaults.frequencyHz} Hz</span>
             <span>−12.4 dBFS</span>
           </div>
         </div>
@@ -259,9 +306,9 @@ export default function App() {
       </section>
 
       <footer className="shell__footer" aria-label="Patches">
-        {PATCH_TABS.map((tab) => (
+        {shellPatchTabs.map((tab) => (
           <button
-            key={tab.id}
+            key={tab.key}
             type="button"
             className={tab.active ? 'patch-tab patch-tab--active' : 'patch-tab'}
           >

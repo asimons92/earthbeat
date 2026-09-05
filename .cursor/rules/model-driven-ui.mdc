@@ -1,0 +1,31 @@
+---
+description: UI option lists and nav labels must come from Clay-generated catalog modules
+alwaysApply: true
+---
+
+# Model-driven UI
+
+Dropdowns, create-nav labels, palette categories, and similar option lists are defined in `clay/model.json` and emitted by Clay into `client/src/generated/`.
+
+## Do
+
+- Add or change options in `clay/model.json` (`catalog.shell`, `catalog.connectorKinds`, Oscillator fields marked `modulatable`, and related catalog seeds)
+- Run `clay generate` (or Clay MCP `clay_generate`) after model changes
+- Import lists and helpers from `@/generated/catalog` (or other files under `client/src/generated/`)
+- Render selects and nav by mapping those generated arrays
+
+## Do not
+
+- Hand-write option arrays (`{ key|id|value, label }` objects) in React or other client source outside `client/src/generated/`
+- Import a hand-maintained `catalog.ts` mirror of the model
+- Copy catalog values into local constants “just for the UI”
+
+## Lint
+
+`pnpm --dir client lint` runs `scripts/check-model-driven-ui.mjs`. Waive a rare case with:
+
+`// earthbeat-ui: exception model-driven — <reason>`
+
+## Agent guidance
+
+See `AGENTS.md` → Model-driven UI.

@@ -3,6 +3,8 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 export type OscillatorNodeData = {
   label: string;
   waveform: string;
+  frequencyHz: number;
+  gain: number;
   status: string;
 };
 

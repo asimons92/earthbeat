@@ -1,0 +1,12 @@
+{
+  "partials": [],
+  "formatters": [],
+  "steps": [
+    {
+      "generate": "templates/catalog.ts",
+      "select": "$.model",
+      "target": "client/src/generated/",
+      "engine": "ejs"
+    }
+  ]
+}

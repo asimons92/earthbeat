@@ -5,9 +5,14 @@
     {
       "path": "clay/model.json",
       "output": ".",
-      "generated_files": {},
-      "last_generated": "2026-09-05T03:04:09.341Z",
-      "input_hash": "c7f77a8c0b77f0bb37bc4cf105ae718d"
+      "generated_files": {
+        "client/src/generated/catalog.ts": {
+          "md5": "53283e5d4e2bcaf663c5e6ce08f8d801",
+          "date": "2026-09-05T04:54:51.952Z"
+        }
+      },
+      "last_generated": "2026-09-05T04:54:51.952Z",
+      "input_hash": "f1738425839ec968df640723069df42f"
     }
   ]
 }

@@ -4,6 +4,10 @@ export type ModulatorNodeData = {
   label: string;
   channelKey: string;
   targetParam: string;
+  inMin: number;
+  inMax: number;
+  outMin: number;
+  outMax: number;
   status: string;
 };
 

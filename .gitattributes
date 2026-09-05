@@ -1,3 +1,4 @@
 # clay:generated:start
 .clay merge=clay-generator
+client/src/generated/catalog.ts linguist-generated=true
 # clay:generated:end
