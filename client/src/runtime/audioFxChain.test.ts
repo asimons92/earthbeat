@@ -1,8 +1,12 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
+import { effectKinds } from '@/generated/catalog';
+
 import {
+  audioFxFailureLabel,
   audioFxFingerprint,
+  audioFxIssueLabelsByNodeId,
   isAudioEffectKindKey,
   resolveOutboundAudioFxChain,
   type AudioFxStep,
@@ -12,8 +16,6 @@ import type { RuntimeEdge, RuntimeNode } from './modulationChain';
 const idArb = fc.uuid();
 const fanInReason = 'fan_in' as const;
 const fanOutReason = 'fan_out' as const;
-const audioKindKeys = ['distortion', 'delay'] as const;
-const controlKindKeys = ['scale_snap', 'other'] as const;
 
 function oscillator(id: string): RuntimeNode {
   return {
@@ -66,17 +68,24 @@ const driveArb = fc.double({ min: 1, max: 20, noNaN: true });
 const timeMsArb = fc.double({ min: 20, max: 1000, noNaN: true });
 const feedbackArb = fc.double({ min: 0, max: 0.95, noNaN: true });
 const mixArb = fc.double({ min: 0, max: 1, noNaN: true });
+const catalogKindArb = fc.constantFrom(...effectKinds);
 
 describe('isAudioEffectKindKey', () => {
-  it('marks distortion and delay as audio and scale_snap as not', () => {
+  it('matches the catalog transforms audio flag for every EffectKind', () => {
     fc.assert(
-      fc.property(
-        fc.constantFrom(...audioKindKeys),
-        fc.constantFrom(...controlKindKeys),
-        (audio, control) => {
-          expect(isAudioEffectKindKey(audio)).toBe(!isAudioEffectKindKey(control));
-        },
-      ),
+      fc.property(catalogKindArb, (kind) => {
+        const expectAudio = kind.transforms.some((entry) => entry === 'audio');
+        expect(isAudioEffectKindKey(kind.key)).toBe(expectAudio);
+      }),
+    );
+  });
+
+  it('rejects kind keys missing from the catalog', () => {
+    fc.assert(
+      fc.property(fc.uuid(), (kindKey) => {
+        fc.pre(!effectKinds.some((kind) => kind.key === kindKey));
+        expect(isAudioEffectKindKey(kindKey)).toBe(isAudioEffectKindKey(''));
+      }),
     );
   });
 });
@@ -201,6 +210,44 @@ describe('resolveOutboundAudioFxChain', () => {
         const expectOk = false;
         expect(result.ok).toBe(expectOk);
         expect(result.ok ? '' : result.reason).toBe(result.ok ? '' : fanOutReason);
+      }),
+    );
+  });
+});
+
+describe('audioFxIssueLabelsByNodeId', () => {
+  it('labels the Oscillator and both Effects on fan-out with the failure status', () => {
+    fc.assert(
+      fc.property(idArb, idArb, idArb, driveArb, timeMsArb, (oscId, distId, delayId, drive, timeMs) => {
+        fc.pre(new Set([oscId, distId, delayId]).size === 3);
+        const nodes = [
+          oscillator(oscId),
+          distortion(distId, drive),
+          delay(delayId, { timeMs, feedback: 0.35, mix: 0.35 }),
+        ];
+        const edges: RuntimeEdge[] = [
+          { id: `${oscId}-${distId}`, source: oscId, target: distId },
+          { id: `${oscId}-${delayId}`, source: oscId, target: delayId },
+        ];
+        const labels = audioFxIssueLabelsByNodeId(nodes, edges);
+        const expected = audioFxFailureLabel(fanOutReason);
+        expect(labels.get(oscId)).toBe(expected);
+        expect(labels.get(distId)).toBe(expected);
+        expect(labels.get(delayId)).toBe(expected);
+      }),
+    );
+  });
+
+  it('omits labels when the outbound audio chain is legal', () => {
+    fc.assert(
+      fc.property(idArb, idArb, driveArb, (oscId, distId, drive) => {
+        fc.pre(oscId !== distId);
+        const nodes = [oscillator(oscId), distortion(distId, drive)];
+        const edges: RuntimeEdge[] = [
+          { id: `${oscId}-${distId}`, source: oscId, target: distId },
+        ];
+        const labels = audioFxIssueLabelsByNodeId(nodes, edges);
+        expect(labels.size).toBe(audioFxIssueLabelsByNodeId(nodes, []).size);
       }),
     );
   });

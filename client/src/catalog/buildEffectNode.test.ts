@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
-import { effectKindsByKey } from '@/generated/catalog';
+import { effectDefaults, effectKindsByKey, scaleSnapScales, scaleSnapTonics } from '@/generated/catalog';
 
 import { buildEffectNode, effectStatusLine } from './buildEffectNode';
 
@@ -72,7 +72,7 @@ describe('buildEffectNode', () => {
     );
   });
 
-  it('builds Scale Snap drafts with tonic and scale status', () => {
+  it('builds Scale Snap drafts with tonic and catalog scale label status', () => {
     fc.assert(
       fc.property(fc.constantFrom(...controlKindKeys), fc.uuid(), (kindKey, newId) => {
         const draft = buildEffectNode({
@@ -83,20 +83,41 @@ describe('buildEffectNode', () => {
           newId,
         });
         expect(draft?.data.kindKey).toBe(kindKey);
-        expect(draft?.data.status).toBe(
-          draft
-            ? effectStatusLine({
-                kindKey: draft.data.kindKey,
-                enabled: draft.data.enabled,
-                tonic: draft.data.tonic,
-                scaleKey: draft.data.scaleKey,
-                drive: draft.data.drive,
-                timeMs: draft.data.timeMs,
-                feedback: draft.data.feedback,
-              })
-            : kindKey,
-        );
+        const scaleLabel =
+          scaleSnapScales.find((entry) => entry.key === draft?.data.scaleKey)?.label ??
+          draft?.data.scaleKey;
+        expect(draft?.data.status).toBe(`${draft?.data.tonic} ${scaleLabel}`);
       }),
+    );
+  });
+
+  it('uses the catalog scale label for control Effect status lines', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...controlKindKeys),
+        fc.constantFrom(...scaleSnapScales),
+        fc.constantFrom(...scaleSnapTonics),
+        (kindKey, scale, tonic) => {
+          const base = {
+            kindKey,
+            tonic: tonic.key,
+            scaleKey: scale.key,
+            drive: effectDefaults.drive,
+            timeMs: effectDefaults.timeMs,
+            feedback: effectDefaults.feedback,
+          };
+          const enabledStatus = effectStatusLine({ ...base, enabled: true });
+          const bypassedStatus = effectStatusLine({ ...base, enabled: false });
+          const otherBypassed = effectStatusLine({
+            ...base,
+            scaleKey: scaleSnapScales.find((entry) => entry.key !== scale.key)?.key ?? scale.key,
+            enabled: false,
+          });
+          expect(enabledStatus).toBe(`${tonic.key} ${scale.label}`);
+          expect(bypassedStatus).not.toBe(enabledStatus);
+          expect(bypassedStatus).toBe(otherBypassed);
+        },
+      ),
     );
   });
 });

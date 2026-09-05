@@ -1,7 +1,9 @@
 # Audio Effect chain in Elementary
 
 Date: 2026-09-05
-Status: decided
+Status: superseded
+
+Superseded by `2026-09-05-catalog-audio-fx-and-issue-cue.md` for catalog audio detection and illegal-chain canvas status. Empty-chain bake on failure and fingerprint rebuild stay.
 
 ## Context
 

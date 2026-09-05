@@ -1,5 +1,7 @@
 /** Outbound Oscillator → audio Effect* chain for Elementary tone baking. */
 
+import { getEffectKind } from '@/generated/catalog';
+
 import {
   clampDrive,
   clampFeedback,
@@ -42,6 +44,8 @@ export type AudioFxChainFail = {
 
 export type AudioFxChainResult = AudioFxChainOk | AudioFxChainFail;
 
+export type AudioFxIssueReason = Exclude<AudioFxChainFail['reason'], 'missing_oscillator'>;
+
 const AUDIO_KIND_DISTORTION = 'distortion';
 const AUDIO_KIND_DELAY = 'delay';
 
@@ -57,9 +61,10 @@ function asString(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.length > 0 ? value : fallback;
 }
 
-/** True when the EffectKind transforms audio (not control Hertz). */
+/** True when the EffectKind catalog entry transforms audio (not control Hertz). */
 export function isAudioEffectKindKey(kindKey: string): boolean {
-  return kindKey === AUDIO_KIND_DISTORTION || kindKey === AUDIO_KIND_DELAY;
+  const kind = getEffectKind(kindKey);
+  return (kind?.transforms ?? []).some((entry) => entry === 'audio');
 }
 
 export function isAudioEffectNode(node: RuntimeNode): boolean {
@@ -153,6 +158,60 @@ export function resolveOutboundAudioFxChain(
     visited.add(next.id);
     cursor = next.id;
   }
+}
+
+/** Short canvas and inspector status when an outbound audio FX chain is illegal. */
+export function audioFxFailureLabel(reason: AudioFxIssueReason): string {
+  if (reason === 'fan_in') return 'FX fan-in — dry';
+  if (reason === 'fan_out') return 'FX fan-out — dry';
+  return 'unknown audio FX — dry';
+}
+
+/** Audio Effect ids reachable outbound from start along audio wires (ignores fan rules). */
+function outboundAudioEffectIds(
+  nodes: RuntimeNode[],
+  edges: RuntimeEdge[],
+  startId: string,
+): string[] {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const found: string[] = [];
+  const queue = [startId];
+  const visited = new Set<string>([startId]);
+  while (queue.length > 0) {
+    const cursor = queue.shift()!;
+    for (const edge of edges) {
+      if (edge.source !== cursor) continue;
+      const target = byId.get(edge.target);
+      if (!target || !isAudioEffectNode(target)) continue;
+      if (visited.has(target.id)) continue;
+      visited.add(target.id);
+      found.push(target.id);
+      queue.push(target.id);
+    }
+  }
+  return found;
+}
+
+/**
+ * Status labels for Oscillators and audio Effects on illegal outbound chains.
+ * Legal chains and Oscillators with no audio Effects are omitted.
+ */
+export function audioFxIssueLabelsByNodeId(
+  nodes: RuntimeNode[],
+  edges: RuntimeEdge[],
+): ReadonlyMap<string, string> {
+  const labels = new Map<string, string>();
+  for (const node of nodes) {
+    if (node.type !== 'oscillator') continue;
+    const result = resolveOutboundAudioFxChain(nodes, edges, node.id);
+    if (result.ok || result.reason === 'missing_oscillator') continue;
+    const label = audioFxFailureLabel(result.reason);
+    labels.set(node.id, label);
+    for (const effectId of outboundAudioEffectIds(nodes, edges, node.id)) {
+      labels.set(effectId, label);
+    }
+  }
+  return labels;
 }
 
 /** Stable identity for voice rebuild when FX topology or params change. */

@@ -40,6 +40,9 @@ import { type ConnectorFlowNode } from '@/nodes/ConnectorNode';
 import { type EffectFlowNode } from '@/nodes/EffectNode';
 import { type ModulatorFlowNode } from '@/nodes/ModulatorNode';
 import { type OscillatorFlowNode } from '@/nodes/OscillatorNode';
+import { audioFxIssueLabelsByNodeId } from '@/runtime/audioFxChain';
+import { toRuntimeEdges, toRuntimeNodes } from '@/runtime/runtimeNodes';
+
 import { isValidPatchConnection } from './isValidPatchConnection';
 
 function nextOffset(count: number) {
@@ -248,20 +251,38 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
     [isOscillatorPlaying, playOscillator, stopOscillator],
   );
 
+  const audioFxIssueLabels = useMemo(
+    () => audioFxIssueLabelsByNodeId(toRuntimeNodes(nodes), toRuntimeEdges(edges)),
+    [edges, nodes],
+  );
+
   const flowNodes = useMemo(
     () =>
       nodes.map((node) => {
-        if (node.type !== 'oscillator') return node;
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            playing: isOscillatorPlaying(node.id),
-            onTogglePlay: onToggleOscillatorPlay,
-          },
-        };
+        const issueStatus = audioFxIssueLabels.get(node.id);
+        if (node.type === 'oscillator') {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              ...(issueStatus ? { status: issueStatus } : {}),
+              playing: isOscillatorPlaying(node.id),
+              onTogglePlay: onToggleOscillatorPlay,
+            },
+          };
+        }
+        if (issueStatus && node.type === 'effect') {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              status: issueStatus,
+            },
+          };
+        }
+        return node;
       }),
-    [isOscillatorPlaying, nodes, onToggleOscillatorPlay],
+    [audioFxIssueLabels, isOscillatorPlaying, nodes, onToggleOscillatorPlay],
   );
 
   const onConnect = useCallback<OnConnect>(

@@ -23,6 +23,14 @@ import {
   scaleSnapTonics,
   usgsConnector,
 } from '@/generated/catalog';
+import { audioFxIssueLabelsByNodeId } from '@/runtime/audioFxChain';
+import {
+  clampDrive,
+  clampFeedback,
+  clampMix,
+  clampTimeMs,
+} from '@/runtime/audioFxParams';
+import { toRuntimeEdges, toRuntimeNodes } from '@/runtime/runtimeNodes';
 
 function modulatorStatus(data: {
   channelKey: string;
@@ -109,6 +117,11 @@ export function NodeInspector({
   const selected = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId) ?? null,
     [nodes, selectedNodeId],
+  );
+
+  const audioFxIssueLabels = useMemo(
+    () => audioFxIssueLabelsByNodeId(toRuntimeNodes(nodes), toRuntimeEdges(edges)),
+    [edges, nodes],
   );
 
   const upstreamConnector = useMemo(() => {
@@ -355,6 +368,7 @@ export function NodeInspector({
     const isAudio = (kind?.transforms ?? []).some((entry) => entry === 'audio');
     const isDistortion = data.kindKey === 'distortion';
     const isDelay = data.kindKey === 'delay';
+    const audioFxIssue = audioFxIssueLabels.get(selected.id);
 
     const patchEffect = (patch: Partial<typeof data>) => {
       const next = { ...data, ...patch };
@@ -374,6 +388,11 @@ export function NodeInspector({
       <aside className="shell__inspector" aria-label="Node inspector">
         <div className="inspector__title">Effect</div>
         <p className="inspector__hint">{data.label}</p>
+        {audioFxIssue ? (
+          <p className="inspector__hint" role="status">
+            {audioFxIssue}
+          </p>
+        ) : null}
         <div className="inspector__field">
           <Label>Effect kind</Label>
           <p className="inspector__readonly">{kind?.label ?? data.kindKey}</p>
@@ -444,7 +463,7 @@ export function NodeInspector({
               max={20}
               step={0.1}
               value={data.drive}
-              onChange={(event) => patchEffect({ drive: Number(event.target.value) })}
+              onChange={(event) => patchEffect({ drive: clampDrive(Number(event.target.value)) })}
             />
           </div>
         ) : null}
@@ -459,7 +478,7 @@ export function NodeInspector({
                 max={1000}
                 step={1}
                 value={data.timeMs}
-                onChange={(event) => patchEffect({ timeMs: Number(event.target.value) })}
+                onChange={(event) => patchEffect({ timeMs: clampTimeMs(Number(event.target.value)) })}
               />
             </div>
             <div className="inspector__field">
@@ -471,7 +490,9 @@ export function NodeInspector({
                 max={0.95}
                 step={0.01}
                 value={data.feedback}
-                onChange={(event) => patchEffect({ feedback: Number(event.target.value) })}
+                onChange={(event) =>
+                  patchEffect({ feedback: clampFeedback(Number(event.target.value)) })
+                }
               />
             </div>
             <div className="inspector__field">
@@ -483,7 +504,7 @@ export function NodeInspector({
                 max={1}
                 step={0.01}
                 value={data.mix}
-                onChange={(event) => patchEffect({ mix: Number(event.target.value) })}
+                onChange={(event) => patchEffect({ mix: clampMix(Number(event.target.value)) })}
               />
             </div>
           </>
@@ -503,11 +524,17 @@ export function NodeInspector({
     };
     const frequencyHz = data.frequencyHz ?? oscillatorDefaults.frequencyHz;
     const gain = data.gain ?? oscillatorDefaults.gain;
+    const audioFxIssue = audioFxIssueLabels.get(selected.id);
 
     return (
       <aside className="shell__inspector" aria-label="Node inspector">
         <div className="inspector__title">Oscillator</div>
         <p className="inspector__hint">{data.label}</p>
+        {audioFxIssue ? (
+          <p className="inspector__hint" role="status">
+            {audioFxIssue}
+          </p>
+        ) : null}
         <div className="inspector__field">
           <Label htmlFor="oscillator-waveform">Waveform</Label>
           <Select

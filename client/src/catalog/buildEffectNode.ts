@@ -1,4 +1,4 @@
-import { effectDefaults, getEffectKind } from '@/generated/catalog';
+import { effectDefaults, getEffectKind, scaleSnapScales } from '@/generated/catalog';
 
 import { resolveConnectorKind } from './resolveConnectorKind';
 
@@ -55,7 +55,8 @@ export function effectStatusLine(data: {
       return `${data.timeMs}ms fb ${data.feedback}`;
     }
   }
-  return `${data.tonic} ${data.scaleKey}`;
+  const scale = scaleSnapScales.find((entry) => entry.key === data.scaleKey);
+  return `${data.tonic} ${scale?.label ?? data.scaleKey}`;
 }
 
 /**
