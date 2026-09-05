@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": ".cursor/hooks/block-clay-generated.js",
+        "matcher": "Write|Delete|StrReplace|EditNotebook",
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/block-clay-generated.js",
+        "matcher": "Shell",
+        "failClosed": false
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/block-clay-generated.js",
+        "failClosed": false
+      }
+    ]
+  }
+}

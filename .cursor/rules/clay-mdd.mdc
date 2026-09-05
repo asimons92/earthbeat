@@ -1,0 +1,25 @@
+---
+description: Model-driven development with Clay — never hand-edit generated files
+alwaysApply: true
+---
+
+# Clay model-driven development
+
+This repo is generated with [Clay](https://morkeleb.github.io/clay/). The domain model and generators are the source of truth; generated outputs are disposable.
+
+## Do
+
+- Edit `clay/model.json` (and includes/mixins under `clay/`) to change domain shape
+- Edit templates and `generator.json` under `clay/generators/`
+- Regenerate with `clay generate` or Clay MCP `clay_generate`
+- Prefer Clay MCP tools (`clay_model_query`, `clay_model_add`, `clay_model_update`, `clay_generate`) when changing the model
+
+## Do not
+
+- Hand-edit files tracked in `.clay` → `generated_files`
+- "Quick fix" generated code — change the model or template, then regenerate
+- Delete generated files to "clean up" unless using `clay clean` / `clay generate` reconciliation
+
+## If a hook blocks an edit
+
+A pre-tool-use hook denied the write because the path is Clay-owned. Update the model/template and regenerate instead.

@@ -1,0 +1,13 @@
+{
+  "gitattributes": true,
+  "automerge": true,
+  "models": [
+    {
+      "path": "clay/model.json",
+      "output": ".",
+      "generated_files": {},
+      "last_generated": "2026-09-05T03:04:09.341Z",
+      "input_hash": "c7f77a8c0b77f0bb37bc4cf105ae718d"
+    }
+  ]
+}

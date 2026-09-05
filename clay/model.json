@@ -1,0 +1,7 @@
+{
+  "name": "earthbeat",
+  "generators": ["./generators/api"],
+  "model": {
+    "types": []
+  }
+}

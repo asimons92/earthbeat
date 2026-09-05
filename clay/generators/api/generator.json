@@ -1,0 +1,11 @@
+{
+  "partials": [],
+  "formatters": [],
+  "steps": [
+    {
+      "generate": "templates/{{name}}.model.ts",
+      "select": "$.model.types[*]",
+      "target": "src/models/"
+    }
+  ]
+}
