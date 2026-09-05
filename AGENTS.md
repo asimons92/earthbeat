@@ -34,6 +34,16 @@ Cursor also loads `.cursor/rules/clay-mdd.mdc` for the same Clay rules.
 
 The Vite React client lives in `client/`. From the repo root, run `pnpm dev` to start it. Play and LIVE controls are stubs until the runtime milestone.
 
+## Testing
+
+Earthbeat uses adversarial, property-based tests. Cursor loads `.cursor/rules/adversarial-testing.mdc`.
+
+1. For a new feature or behavior change, write invariant and constraint tests first. Halt for human approval before any application implementation.
+2. Prefer `fast-check` properties and model-based state machines over fixed example assertions.
+3. Do not put hardcoded string, boolean, or number literals in assertion expected values. Use generators or factories.
+4. For canvas or shell wiring tests only, start the file with `// earthbeat-test: exception ui-surface — <reason>`. That waives the `fast-check` import requirement, not the other bans.
+5. Run `pnpm --dir client test` and `pnpm --dir client lint` after test changes. Lint includes `scripts/check-test-invariants.mjs`.
+
 ## Language
 
 Project docs and agent replies follow Simple English. See `.cursor/rules/simple-english.mdc` and `.agents/skills/simple-english/` when that rule is active.

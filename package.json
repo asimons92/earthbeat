@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "pnpm --dir client dev",
     "build": "pnpm --dir client build",
+    "test": "pnpm --dir client test",
     "lint": "pnpm --dir client lint"
   }
 }

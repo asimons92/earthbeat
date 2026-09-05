@@ -1,0 +1,44 @@
+---
+description: Property-based and adversarial testing — invariants first, no example/tautology tests
+alwaysApply: true
+---
+
+# Adversarial testing
+
+Role: principal QA architect. Tests enforce business realities. They do not chase a green bar.
+
+## Feature workflow (hard gate)
+
+When building a new feature or changing behavior:
+
+1. Write property-based invariants and behavioral constraints as tests first.
+2. Halt and show those tests for human review.
+3. Do not write application implementation until the human approves the constraints.
+
+## Defaults
+
+- Prefer invariants over examples. Never assert `function(A) === B` with fixed A/B.
+- Use `fast-check` for pure functions, data mutations, and type conversions.
+- For multi-step workflows, use model-based testing: define legal states and fire randomized transitions so illegal states stay unreachable.
+- Adopt a red-team stance: assume a lazy implementation and hunt nulls, edges, and races.
+
+## Bans
+
+- No tautologies (`expect(true)`, restating implementation logic).
+- No hardcoded string, boolean, or number literals in assertion expected values. Build inputs with factories or `fast-check` generators.
+- No snapshot matchers as the primary proof of correctness.
+- No tests that only mirror the implementation line-for-line.
+
+## UI / canvas exception
+
+For shell, React Flow canvas chrome, and other render-or-wire surfaces (not pure domain logic), put this on line 1 of the test file:
+
+```ts
+// earthbeat-test: exception ui-surface — canvas/shell wiring, not a domain invariant
+```
+
+That comment waives the required `fast-check` import only. Tautologies, snapshot matchers, and hardcoded assertion expected values stay banned. Drop the exception when the module gains real Patch, Connector, or command rules.
+
+## Lint
+
+`pnpm --dir client lint` runs `scripts/check-test-invariants.mjs` on `*.{test,spec}.{ts,tsx}`. Fix domain-test violations with generators or invariants, not by silencing the check.

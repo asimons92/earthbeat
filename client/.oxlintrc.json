@@ -4,5 +4,30 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.{test,spec}.{ts,tsx,js,jsx}"],
+      "plugins": ["vitest"],
+      "rules": {
+        "vitest/expect-expect": "error",
+        "vitest/no-disabled-tests": "error",
+        "vitest/no-focused-tests": "error",
+        "vitest/no-identical-title": "error",
+        "vitest/no-conditional-expect": "error",
+        "vitest/no-commented-out-tests": "warn",
+        "vitest/no-restricted-matchers": [
+          "error",
+          {
+            "toMatchSnapshot": "Snapshots overfit examples. Assert invariants with fast-check instead.",
+            "toMatchInlineSnapshot": "Snapshots overfit examples. Assert invariants with fast-check instead.",
+            "toThrowErrorMatchingSnapshot": "Snapshots overfit examples. Assert an error invariant instead.",
+            "toThrowErrorMatchingInlineSnapshot": "Snapshots overfit examples. Assert an error invariant instead.",
+            "toBeTruthy": "Too weak. Assert a concrete invariant.",
+            "toBeFalsy": "Too weak. Assert a concrete invariant."
+          }
+        ]
+      }
+    }
+  ]
 }
