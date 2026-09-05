@@ -424,6 +424,13 @@ select {
   overflow-x: auto;
 }
 
+.theme-toggle {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(52px + 0.75rem);
+  z-index: 40;
+}
+
 .patch-tab {
   flex: 0 0 auto;
   padding: 0.55rem 0.9rem;

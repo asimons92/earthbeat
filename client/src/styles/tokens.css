@@ -4,6 +4,8 @@
  */
 
 :root {
+  color-scheme: light;
+
   /* Earthbeat surfaces */
   --bg: #f7f4ee;
   --bg-panel: #f1eee6;
@@ -60,4 +62,57 @@
   --sidebar-accent-foreground: #121212;
   --sidebar-border: #121212;
   --sidebar-ring: #121212;
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Earthbeat surfaces — inverted eggshell ground */
+  --bg: #161513;
+  --bg-panel: #1c1a17;
+  --bg-node: #24211c;
+
+  /* Earthbeat ink / lines */
+  --ink: #f7f4ee;
+  --ink-muted: #a8a49c;
+  --line: #f7f4ee;
+  --line-muted: #3f3b34;
+  --grid-dot: #3f3b34;
+
+  /* Accents unchanged */
+  --live: #c43c3c;
+  --danger: #c43c3c;
+
+  /* shadcn / Tailwind semantic bridge */
+  --background: #161513;
+  --foreground: #f7f4ee;
+  --card: #24211c;
+  --card-foreground: #f7f4ee;
+  --popover: #24211c;
+  --popover-foreground: #f7f4ee;
+  --primary: #f7f4ee;
+  --primary-foreground: #161513;
+  --secondary: #1c1a17;
+  --secondary-foreground: #f7f4ee;
+  --muted: #1c1a17;
+  --muted-foreground: #a8a49c;
+  --accent: #1c1a17;
+  --accent-foreground: #f7f4ee;
+  --destructive: #c43c3c;
+  --border: #f7f4ee;
+  --input: #f7f4ee;
+  --ring: #f7f4ee;
+  --chart-1: #f7f4ee;
+  --chart-2: #a8a49c;
+  --chart-3: #3f3b34;
+  --chart-4: #1c1a17;
+  --chart-5: #c43c3c;
+  --sidebar: #1c1a17;
+  --sidebar-foreground: #f7f4ee;
+  --sidebar-primary: #f7f4ee;
+  --sidebar-primary-foreground: #161513;
+  --sidebar-accent: #161513;
+  --sidebar-accent-foreground: #f7f4ee;
+  --sidebar-border: #f7f4ee;
+  --sidebar-ring: #f7f4ee;
 }

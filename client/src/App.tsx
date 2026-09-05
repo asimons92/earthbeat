@@ -28,6 +28,8 @@ import { decideAuthChrome } from '@/persist/sessionBootstrap';
 import { startGoogleSignIn, startSignOut } from '@/persist/authActions';
 import { usePatchPersist } from '@/persist/usePatchPersist';
 import { usePatchRuntime } from '@/runtime/usePatchRuntime';
+import { ThemeToggle } from '@/theme/ThemeToggle';
+import { useTheme } from '@/theme/useTheme';
 import { ConnectorNode, type ConnectorFlowNode } from './nodes/ConnectorNode';
 import { ModulatorNode, type ModulatorFlowNode } from './nodes/ModulatorNode';
 import { OscillatorNode, type OscillatorFlowNode } from './nodes/OscillatorNode';
@@ -108,6 +110,7 @@ function persistLabel(status: string) {
 }
 
 export default function App() {
+  const { mode: themeMode } = useTheme();
   const [nodes, setNodes, onNodesChangeBase] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -434,6 +437,7 @@ export default function App() {
             onConnect={onConnect}
             onSelectionChange={onSelectionChange}
             nodeTypes={nodeTypes}
+            colorMode={themeMode}
             fitView
             proOptions={{ hideAttribution: true }}
             nodesDraggable
@@ -509,6 +513,8 @@ export default function App() {
           +
         </button>
       </footer>
+
+      <ThemeToggle />
     </div>
   );
 }

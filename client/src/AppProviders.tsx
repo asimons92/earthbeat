@@ -1,6 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
+import { ThemeProvider } from './theme/ThemeProvider';
 import { createQueryClient, createTrpcClient, trpc } from './trpc';
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -9,7 +10,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </QueryClientProvider>
     </trpc.Provider>
   );
 }

@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client';
 
 import App from './App.tsx';
 import { AppProviders } from './AppProviders.tsx';
+import { applyDocumentTheme, readStoredTheme } from './theme/applyTheme';
 import './index.css';
+
+applyDocumentTheme(readStoredTheme());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
