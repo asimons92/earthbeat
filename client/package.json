@@ -15,6 +15,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@elemaudio/core": "^4.0.1",
+    "@elemaudio/web-renderer": "^4.0.3",
     "@fontsource-variable/geist": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@xyflow/react": "^12.11.6",

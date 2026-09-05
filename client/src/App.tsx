@@ -24,6 +24,7 @@ import {
   shellPatchTabs,
   usgsConnector,
 } from '@/generated/catalog';
+import { usePatchRuntime } from '@/runtime/usePatchRuntime';
 import { ConnectorNode, type ConnectorFlowNode } from './nodes/ConnectorNode';
 import { ModulatorNode, type ModulatorFlowNode } from './nodes/ModulatorNode';
 import { OscillatorNode, type OscillatorFlowNode } from './nodes/OscillatorNode';
@@ -95,10 +96,6 @@ function nextOffset(count: number) {
   return { x: 60 + (count % 5) * 36, y: 60 + (count % 5) * 36 };
 }
 
-function noopTransport() {
-  // Shell stub: live audio and USGS streaming come later.
-}
-
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -108,8 +105,42 @@ export default function App() {
     [],
   );
 
-  const onPlay = useCallback(() => noopTransport(), []);
-  const onStop = useCallback(() => noopTransport(), []);
+  const {
+    liveStatus,
+    lastSample,
+    playOscillator,
+    stopOscillator,
+    playAllOscillators,
+    stopAllOscillators,
+    isOscillatorPlaying,
+  } = usePatchRuntime(nodes, edges);
+
+  const onToggleOscillatorPlay = useCallback(
+    (nodeId: string) => {
+      if (isOscillatorPlaying(nodeId)) {
+        stopOscillator(nodeId);
+      } else {
+        playOscillator(nodeId);
+      }
+    },
+    [isOscillatorPlaying, playOscillator, stopOscillator],
+  );
+
+  const flowNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        if (node.type !== 'oscillator') return node;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            playing: isOscillatorPlaying(node.id),
+            onTogglePlay: onToggleOscillatorPlay,
+          },
+        };
+      }),
+    [isOscillatorPlaying, nodes, onToggleOscillatorPlay],
+  );
 
   const onConnect = useCallback<OnConnect>(
     (connection) => {
@@ -228,13 +259,44 @@ export default function App() {
           </select>
         </label>
         <div className="shell__transport">
-          <Button type="button" variant="outline" size="icon" onClick={onPlay} aria-label="Play">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={playAllOscillators}
+            aria-label="Play all oscillators"
+          >
             ▶
           </Button>
-          <Button type="button" variant="outline" size="icon" onClick={onStop} aria-label="Stop">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={stopAllOscillators}
+            aria-label="Stop all oscillators"
+          >
             ■
           </Button>
-          <span className="live-badge" title="Live feed not connected yet">
+          <span
+            className={
+              liveStatus === 'live'
+                ? 'live-badge live-badge--on'
+                : liveStatus === 'error'
+                  ? 'live-badge live-badge--error'
+                  : liveStatus === 'connecting'
+                    ? 'live-badge live-badge--connecting'
+                    : 'live-badge'
+            }
+            title={
+              liveStatus === 'live'
+                ? 'USGS stream connected'
+                : liveStatus === 'error'
+                  ? 'USGS stream error — retrying'
+                  : liveStatus === 'connecting'
+                    ? 'Connecting to USGS stream'
+                    : 'Live feed idle'
+            }
+          >
             <span className="live-badge__dot" />
             LIVE
           </span>
@@ -255,7 +317,7 @@ export default function App() {
 
         <main className="shell__canvas">
           <ReactFlow
-            nodes={nodes}
+            nodes={flowNodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
@@ -290,8 +352,10 @@ export default function App() {
         <div className="monitor__meta">
           <div className="monitor__title">Output monitor</div>
           <div className="monitor__readout">
-            <span>{oscillatorDefaults.frequencyHz} Hz</span>
-            <span>−12.4 dBFS</span>
+            <span>
+              {lastSample?.mag != null ? `M ${lastSample.mag}` : `${oscillatorDefaults.frequencyHz} Hz`}
+            </span>
+            <span>{lastSample?.place ?? 'Waiting for samples'}</span>
           </div>
         </div>
         <svg className="monitor__wave" viewBox="0 0 800 80" preserveAspectRatio="none" aria-hidden>

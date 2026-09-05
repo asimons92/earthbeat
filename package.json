@@ -2,7 +2,9 @@
   "name": "earthbeat_2",
   "private": true,
   "scripts": {
-    "dev": "pnpm --dir client dev",
+    "dev": "pnpm --parallel --filter client --filter server dev",
+    "dev:client": "pnpm --dir client dev",
+    "dev:server": "pnpm --dir server dev",
     "build": "pnpm --dir client build",
     "test": "pnpm --dir client test",
     "lint": "pnpm --dir client lint"

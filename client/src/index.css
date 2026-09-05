@@ -129,6 +129,42 @@ select {
   background: var(--live);
 }
 
+.live-badge:not(.live-badge--on, .live-badge--connecting, .live-badge--error) {
+  opacity: 0.45;
+}
+
+.live-badge--connecting {
+  opacity: 0.75;
+}
+
+.live-badge--connecting .live-badge__dot {
+  animation: live-pulse 1s ease-in-out infinite;
+}
+
+.live-badge--on {
+  opacity: 1;
+}
+
+.live-badge--error {
+  border-color: var(--ink-muted);
+  color: var(--ink-muted);
+}
+
+.live-badge--error .live-badge__dot {
+  background: var(--ink-muted);
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 .shell__body {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr) 260px;
@@ -265,6 +301,27 @@ select {
   color: var(--ink);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
+}
+
+.graph-node__play {
+  margin-top: 0.65rem;
+  min-width: 2rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control, 6px);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.graph-node__play:hover {
+  background: var(--bg-panel);
+}
+
+.graph-node__play--on {
+  border-color: var(--live);
+  color: var(--live);
 }
 
 .graph-node .react-flow__handle {
