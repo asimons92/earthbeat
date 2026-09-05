@@ -34,7 +34,12 @@ Prefer Tailwind semantic classes:
 - Flat surfaces, 1px black/near-black borders
 - One type pair (`--font-brand`, `--font-ui`)
 - Color only for live/error state
-- Add UI pieces with `pnpm dlx shadcn@latest add <component>`
+- For app chrome (buttons, inputs, dialogs, menus, tabs, selects, etc.): use shadcn
+  1. Reuse `client/src/components/ui/*` if present
+  2. Otherwise `pnpm --dir client dlx shadcn@latest add <component>`
+  3. Import from `@/components/ui/...`
+
+Hand-build only instrument/canvas UI: React Flow nodes/edges, waveforms, palette icons, shell layout grid.
 
 ## Do not
 
@@ -43,6 +48,7 @@ Prefer Tailwind semantic classes:
 - Arbitrary colors (`bg-[#…]`, `text-[rgb(…)]`)
 - Soft multi-layer shadows, glows, glass, neumorphism
 - A second color theme (Geist defaults, purple presets, dark-mode palette) without updating tokens first
+- Invent custom Button/Input/Dialog/Select/etc. when shadcn can provide them
 
 ## Enforcement
 

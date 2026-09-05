@@ -1,5 +1,5 @@
 ---
-description: Eggshell/black UI tokens — Tailwind/shadcn semantic colors only
+description: Eggshell/black UI tokens — prefer shadcn for app chrome
 globs: client/**/*.{css,tsx,ts,jsx,js}
 alwaysApply: false
 ---
@@ -22,11 +22,22 @@ Visual source of truth: `docs/earthbeat-ui-eggshell-minimal.png` and `docs/ui-co
 - No soft shadows, glows, gradients, glass, or neumorphism
 - Keep DM Sans / Syne — do not reintroduce Geist or preset marketing fonts
 
-## Components
+## Components (required for agents)
 
-- Prefer shadcn primitives in `client/src/components/ui`
-- Add with `pnpm dlx shadcn@latest add <name>`
-- Shell layout may still use `index.css` BEM classes; new controls should use tokens/shadcn
+**App chrome must use shadcn** — do not invent parallel Button / Input / Dialog / Select / Tabs / Dropdown / Checkbox / Switch / Popover / Sheet / Tooltip components.
+
+1. Check `client/src/components/ui` for an existing primitive
+2. If missing, add it: `pnpm --dir client dlx shadcn@latest add <name>`
+3. Import from `@/components/ui/...` and style with semantic tokens only
+
+**Allowed to hand-build** (instrument / canvas surface):
+
+- React Flow nodes, edges, handles, and canvas chrome
+- Waveform / monitor SVG and live readouts
+- Node palette icons and patch-specific graph UI
+- Shell layout structure in `index.css` (header/sidebar/footer grid)
+
+Do not hand-roll a second design system beside shadcn for forms, dialogs, menus, or toolbar controls.
 
 ## Verify
 
