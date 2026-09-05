@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
+import { oscillatorDefaults } from '@/generated/catalog';
+
 import { createPatchAudioEngine, type PatchAudioEngine } from './audioEngine';
 import {
   createPatchTransportState,
@@ -114,8 +116,10 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
       const restingFreq =
         typeof osc?.data.frequencyHz === 'number' ? osc.data.frequencyHz : params.frequencyHz;
       const restingGain = typeof osc?.data.gain === 'number' ? osc.data.gain : params.gain;
+      const waveform =
+        typeof osc?.data.waveform === 'string' ? osc.data.waveform : oscillatorDefaults.waveform;
       if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) continue;
-      const voice = await engine.ensureVoice(oscillatorId, restingFreq, restingGain);
+      const voice = await engine.ensureVoice(oscillatorId, restingFreq, restingGain, waveform);
       if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) {
         await engine.removeVoice(oscillatorId);
         continue;

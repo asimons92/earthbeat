@@ -22,7 +22,7 @@ Patch Library is the route that lists Patches owned by the signed-in User. Path:
 
 Modulator is a canvas node that maps a Channel onto an Oscillator parameter. Example: `mag` to frequency with ratios of the Oscillator base. React Flow edges between nodes are plain Wires. They do not store mapping data.
 
-Oscillator is a canvas node that makes sound. The catalog default waveform is sine.
+Oscillator is a canvas node that makes sound. Legal waveforms are sine, square, saw, and noise. The catalog default waveform is sine.
 
 Effect is a canvas node that transforms a control signal on the path into an Oscillator. The first EffectKind is Scale Snap: it snaps Hertz to the nearest equal-temperament pitch in a chosen tonic and named scale. When Enable is off, Hertz passes through unchanged.
 
@@ -52,7 +52,7 @@ Do not put mapping parameters on React Flow edges. Mapping belongs on a Modulato
 
 `noaa_coops_tides` is the second ConnectorKind. It uses the NOAA CO-OPS Data Retrieval API with product `water_level`. The default station is `9414290` (San Francisco). Modulatable channel is `waterLevel`. Display channels include `time` and `stationId`. The server polls about every six minutes and scrubs a recent window into a slow loop over SSE at `/api/tides/stream`.
 
-Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with Elementary as the audio runtime. Modulatable params are `frequencyHz` and `gain`.
+Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with Elementary as the audio runtime. Waveform choices are `sine`, `square`, `saw`, and `noise`. Modulatable params are `frequencyHz` and `gain`.
 
 Scale Snap Effect defaults are tonic `C`, scale `major`, enabled on, and A4 at `440` Hz. Catalog scales are major, natural minor, major pentatonic, and minor pentatonic.
 

@@ -17,6 +17,7 @@ import {
   modulatableChannelsForKind,
   oscillatorDefaults,
   oscillatorModulatableParams,
+  oscillatorWaveforms,
   scaleSnapScales,
   scaleSnapTonics,
   usgsConnector,
@@ -440,8 +441,31 @@ export function NodeInspector({
         <div className="inspector__title">Oscillator</div>
         <p className="inspector__hint">{data.label}</p>
         <div className="inspector__field">
-          <Label>Waveform</Label>
-          <p className="inspector__readonly">{data.waveform}</p>
+          <Label htmlFor="oscillator-waveform">Waveform</Label>
+          <Select
+            value={data.waveform}
+            onValueChange={(value) => {
+              if (!value) return;
+              onChangeNodeData(selected.id, {
+                ...data,
+                waveform: value,
+                frequencyHz,
+                gain,
+                status: `${frequencyHz} Hz`,
+              });
+            }}
+          >
+            <SelectTrigger id="oscillator-waveform" size="sm">
+              <SelectValue placeholder="Waveform" />
+            </SelectTrigger>
+            <SelectContent>
+              {oscillatorWaveforms.map((waveform) => (
+                <SelectItem key={waveform.key} value={waveform.key}>
+                  {waveform.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="inspector__field">
           <Label htmlFor="oscillator-frequency">Frequency (Hz)</Label>

@@ -1,6 +1,13 @@
 import { el, type ElemNode } from '@elemaudio/core';
 import WebRenderer from '@elemaudio/web-renderer';
 
+import {
+  buildOscillatorTone,
+  OSCILLATOR_WAVEFORM_KEYS,
+  planVoiceEnsure,
+  resolveOscillatorWaveform,
+} from './oscillatorTone';
+
 export type VoiceControls = {
   setFrequency: (freqHz: number) => Promise<void>;
   setGain: (gain: number) => Promise<void>;
@@ -8,7 +15,12 @@ export type VoiceControls = {
 
 export type PatchAudioEngine = {
   ctx: AudioContext;
-  ensureVoice: (oscillatorId: string, initialFreqHz: number, initialGain: number) => Promise<VoiceControls>;
+  ensureVoice: (
+    oscillatorId: string,
+    initialFreqHz: number,
+    initialGain: number,
+    waveform?: string,
+  ) => Promise<VoiceControls>;
   setVoiceAudible: (oscillatorId: string, audible: boolean) => Promise<void>;
   removeVoice: (oscillatorId: string) => Promise<void>;
   /** Drop every voice and commit silence (Stop / idle). */
@@ -25,11 +37,8 @@ type VoiceState = {
   lastGain: number;
   audible: boolean;
   tone: ElemNode;
+  waveform: string;
 };
-
-function sineTone(t: ElemNode) {
-  return el.sin(el.mul(2 * Math.PI, t));
-}
 
 export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
   const ctx = new AudioContext();
@@ -66,16 +75,13 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     return rebuildQueue;
   }
 
-  async function ensureVoice(
+  async function createVoice(
     oscillatorId: string,
     initialFreqHz: number,
     initialGain: number,
+    waveform: string,
   ): Promise<VoiceControls> {
-    const existing = voices.get(oscillatorId);
-    if (existing) {
-      return existing.controls;
-    }
-
+    const resolvedWaveform = resolveOscillatorWaveform(waveform);
     const [freq, setFreqProps] = core.createRef('const', { value: initialFreqHz }, []) as [
       ElemNode,
       (props: { value: number }) => Promise<void>,
@@ -84,7 +90,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
       ElemNode,
       (props: { value: number }) => Promise<void>,
     ];
-    const tone = el.mul(sineTone(el.phasor(freq)), gain);
+    const tone = el.mul(buildOscillatorTone(resolvedWaveform, freq), gain);
 
     const controls: VoiceControls = {
       setFrequency: async (freqHz) => {
@@ -109,10 +115,32 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
       lastGain: initialGain,
       audible: true,
       tone,
+      waveform: resolvedWaveform,
     });
 
     await enqueueRebuild();
     return controls;
+  }
+
+  async function ensureVoice(
+    oscillatorId: string,
+    initialFreqHz: number,
+    initialGain: number,
+    waveform = OSCILLATOR_WAVEFORM_KEYS[0],
+  ): Promise<VoiceControls> {
+    const existing = voices.get(oscillatorId);
+    const plan = planVoiceEnsure(existing?.waveform, waveform);
+
+    if (plan === 'reuse' && existing) {
+      return existing.controls;
+    }
+
+    if (plan === 'rebuild' && existing) {
+      voices.delete(oscillatorId);
+      await enqueueRebuild();
+    }
+
+    return createVoice(oscillatorId, initialFreqHz, initialGain, waveform);
   }
 
   async function setVoiceAudible(oscillatorId: string, audible: boolean) {

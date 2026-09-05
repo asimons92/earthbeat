@@ -744,7 +744,7 @@
       },
       {
         "name": "Oscillator",
-        "description": "Canvas node: sound generator via Elementary (@elemaudio/core + web-renderer). MVP waveform is sine only (phasor driven by frequencyHz).",
+        "description": "Canvas node: sound generator via Elementary (@elemaudio/core + web-renderer). Waveforms: sine, square, saw, noise.",
         "fields": [
           {
             "name": "id",
@@ -776,9 +776,12 @@
             "type": "string",
             "required": true,
             "enum": [
-              "sine"
+              "sine",
+              "square",
+              "saw",
+              "noise"
             ],
-            "description": "Tone shape. Only sine is implemented in the Elementary graph for now."
+            "description": "Tone shape. Sine uses phasor+sin; square and saw use blep oscillators; noise is white and ignores frequencyHz."
           },
           {
             "name": "frequencyHz",

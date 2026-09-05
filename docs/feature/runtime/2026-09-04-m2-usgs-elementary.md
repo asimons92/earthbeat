@@ -1,7 +1,9 @@
 # M2 USGS runtime and deferred Patch clock
 
 Date: 2026-09-04
-Status: decided
+Status: superseded
+
+Superseded for waveforms only: see `docs/feature/runtime/2026-09-05-oscillator-waveforms.md`. The USGS stream and transport decisions below still stand.
 
 ## Context
 

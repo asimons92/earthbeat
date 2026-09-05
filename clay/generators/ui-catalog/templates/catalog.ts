@@ -15,6 +15,11 @@
       modulationOutMax:
         field.modulationOutMax !== undefined ? field.modulationOutMax : field.max,
     }));
+  const waveformField = (oscillator?.fields || []).find((field) => field.name === 'waveform');
+  const oscillatorWaveforms = (waveformField?.enum || []).map((key) => ({
+    key,
+    label: helpers.startCase(key),
+  }));
   const shell = catalog.shell || {};
   const dump = (value) => JSON.stringify(value, null, 2);
 %>
@@ -50,6 +55,8 @@ export const scaleSnapScales = <%- dump(catalog.scaleSnapScales || []) %> as con
 export const effectDefaults = <%- dump(catalog.effectDefaults) %> as const;
 
 export const oscillatorDefaults = <%- dump(catalog.oscillatorDefaults) %> as const;
+
+export const oscillatorWaveforms = <%- dump(oscillatorWaveforms) %> as const;
 
 export const modulatorDefaults = <%- dump(catalog.modulatorDefaults) %> as const;
 

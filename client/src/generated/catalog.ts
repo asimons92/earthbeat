@@ -269,6 +269,25 @@ export const oscillatorDefaults = {
   "notes": "Matches earthbeat v1 Elementary WebRenderer sine (el.phasor + el.sin)."
 } as const;
 
+export const oscillatorWaveforms = [
+  {
+    "key": "sine",
+    "label": "Sine"
+  },
+  {
+    "key": "square",
+    "label": "Square"
+  },
+  {
+    "key": "saw",
+    "label": "Saw"
+  },
+  {
+    "key": "noise",
+    "label": "Noise"
+  }
+] as const;
+
 export const modulatorDefaults = {
   "channelKey": "mag",
   "targetParam": "frequencyHz",
