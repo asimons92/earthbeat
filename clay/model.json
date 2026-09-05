@@ -2,6 +2,247 @@
   "name": "earthbeat",
   "generators": ["./generators/api"],
   "model": {
-    "types": []
+    "types": [
+      {
+        "name": "User",
+        "fields": [
+          { "name": "id", "type": "string", "required": true },
+          { "name": "email", "type": "string", "required": true },
+          { "name": "name", "type": "string" },
+          { "name": "image", "type": "string" },
+          { "name": "provider", "type": "string", "required": true },
+          { "name": "providerSubject", "type": "string", "required": true },
+          { "name": "createdAt", "type": "timestamp", "required": true },
+          { "name": "updatedAt", "type": "timestamp", "required": true }
+        ],
+        "commands": [
+          {
+            "name": "upsertFromAuth",
+            "parameters": [
+              { "name": "email", "type": "string", "required": true },
+              { "name": "name", "type": "string" },
+              { "name": "image", "type": "string" },
+              { "name": "provider", "type": "string", "required": true },
+              { "name": "providerSubject", "type": "string", "required": true }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Pipeline",
+        "fields": [
+          { "name": "id", "type": "string", "required": true },
+          { "name": "userId", "type": "string", "required": true, "ref": "User" },
+          { "name": "name", "type": "string", "required": true },
+          { "name": "createdAt", "type": "timestamp", "required": true },
+          { "name": "updatedAt", "type": "timestamp", "required": true }
+        ],
+        "commands": [
+          {
+            "name": "create",
+            "parameters": [
+              { "name": "name", "type": "string", "required": true }
+            ]
+          },
+          {
+            "name": "rename",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true },
+              { "name": "name", "type": "string", "required": true }
+            ]
+          },
+          {
+            "name": "delete",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Connector",
+        "description": "Catalog entry for a natural-signal API kind (not a canvas node).",
+        "fields": [
+          { "name": "key", "type": "string", "required": true },
+          { "name": "label", "type": "string", "required": true },
+          { "name": "description", "type": "string" },
+          {
+            "name": "channels",
+            "type": "array",
+            "required": true,
+            "of": {
+              "name": "Channel",
+              "fields": [
+                { "name": "key", "type": "string", "required": true },
+                { "name": "label", "type": "string", "required": true },
+                { "name": "unit", "type": "string" },
+                { "name": "min", "type": "number" },
+                { "name": "max", "type": "number" }
+              ]
+            }
+          }
+        ],
+        "commands": [
+          {
+            "name": "register",
+            "parameters": [
+              { "name": "key", "type": "string", "required": true },
+              { "name": "label", "type": "string", "required": true },
+              { "name": "description", "type": "string" },
+              { "name": "channels", "type": "array", "required": true }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Connection",
+        "description": "Canvas node: an instance of a Connector inside a Pipeline.",
+        "fields": [
+          { "name": "id", "type": "string", "required": true },
+          { "name": "pipelineId", "type": "string", "required": true, "ref": "Pipeline" },
+          { "name": "connectorKey", "type": "string", "required": true, "ref": "Connector" },
+          { "name": "label", "type": "string" },
+          { "name": "positionX", "type": "number", "required": true },
+          { "name": "positionY", "type": "number", "required": true },
+          { "name": "config", "type": "json" }
+        ],
+        "commands": [
+          {
+            "name": "add",
+            "parameters": [
+              { "name": "pipelineId", "type": "string", "required": true },
+              { "name": "connectorKey", "type": "string", "required": true },
+              { "name": "positionX", "type": "number", "required": true },
+              { "name": "positionY", "type": "number", "required": true },
+              { "name": "label", "type": "string" },
+              { "name": "config", "type": "json" }
+            ]
+          },
+          {
+            "name": "move",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true },
+              { "name": "positionX", "type": "number", "required": true },
+              { "name": "positionY", "type": "number", "required": true }
+            ]
+          },
+          {
+            "name": "updateConfig",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true },
+              { "name": "config", "type": "json", "required": true }
+            ]
+          },
+          {
+            "name": "remove",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Oscillator",
+        "description": "Canvas node: sound generator driven by incoming modulations.",
+        "fields": [
+          { "name": "id", "type": "string", "required": true },
+          { "name": "pipelineId", "type": "string", "required": true, "ref": "Pipeline" },
+          { "name": "label", "type": "string" },
+          { "name": "positionX", "type": "number", "required": true },
+          { "name": "positionY", "type": "number", "required": true },
+          { "name": "waveform", "type": "string", "required": true },
+          { "name": "baseFrequencyHz", "type": "number", "required": true },
+          { "name": "gain", "type": "number", "required": true }
+        ],
+        "commands": [
+          {
+            "name": "add",
+            "parameters": [
+              { "name": "pipelineId", "type": "string", "required": true },
+              { "name": "positionX", "type": "number", "required": true },
+              { "name": "positionY", "type": "number", "required": true },
+              { "name": "waveform", "type": "string" },
+              { "name": "baseFrequencyHz", "type": "number" },
+              { "name": "gain", "type": "number" },
+              { "name": "label", "type": "string" }
+            ]
+          },
+          {
+            "name": "move",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true },
+              { "name": "positionX", "type": "number", "required": true },
+              { "name": "positionY", "type": "number", "required": true }
+            ]
+          },
+          {
+            "name": "updateParams",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true },
+              { "name": "waveform", "type": "string" },
+              { "name": "baseFrequencyHz", "type": "number" },
+              { "name": "gain", "type": "number" },
+              { "name": "label", "type": "string" }
+            ]
+          },
+          {
+            "name": "remove",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Modulation",
+        "description": "Graph edge from a Connection to an Oscillator, with mapping parameters (what the signal does to the sound).",
+        "fields": [
+          { "name": "id", "type": "string", "required": true },
+          { "name": "pipelineId", "type": "string", "required": true, "ref": "Pipeline" },
+          { "name": "fromConnectionId", "type": "string", "required": true, "ref": "Connection" },
+          { "name": "toOscillatorId", "type": "string", "required": true, "ref": "Oscillator" },
+          { "name": "channelKey", "type": "string", "required": true },
+          { "name": "targetParam", "type": "string", "required": true },
+          { "name": "inMin", "type": "number", "required": true },
+          { "name": "inMax", "type": "number", "required": true },
+          { "name": "outMin", "type": "number", "required": true },
+          { "name": "outMax", "type": "number", "required": true }
+        ],
+        "commands": [
+          {
+            "name": "connect",
+            "parameters": [
+              { "name": "pipelineId", "type": "string", "required": true },
+              { "name": "fromConnectionId", "type": "string", "required": true },
+              { "name": "toOscillatorId", "type": "string", "required": true },
+              { "name": "channelKey", "type": "string", "required": true },
+              { "name": "targetParam", "type": "string", "required": true },
+              { "name": "inMin", "type": "number" },
+              { "name": "inMax", "type": "number" },
+              { "name": "outMin", "type": "number" },
+              { "name": "outMax", "type": "number" }
+            ]
+          },
+          {
+            "name": "updateMapping",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true },
+              { "name": "channelKey", "type": "string" },
+              { "name": "targetParam", "type": "string" },
+              { "name": "inMin", "type": "number" },
+              { "name": "inMax", "type": "number" },
+              { "name": "outMin", "type": "number" },
+              { "name": "outMax", "type": "number" }
+            ]
+          },
+          {
+            "name": "disconnect",
+            "parameters": [
+              { "name": "id", "type": "string", "required": true }
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

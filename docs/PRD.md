@@ -152,6 +152,21 @@ Agreed leaning for implementation (detail belongs in architecture docs / Clay ge
 | Live feeds | Server-mediated poll/stream where needed (CORS, rate limits, secrets) |
 | Codegen | Clay for model-driven types, mutations, and repetitive surfaces |
 | Auth | Google OAuth (or equivalent) upserting a thin User |
+| Mutations | All domain commands run inside a DB transaction |
+
+### Decision: transactional mutations
+
+**Decision:** every domain mutation (Clay command / tRPC mutation that writes) runs in a **single database transaction**.
+
+**Why (even without multiplayer canvas):** one user can still race themselves via autosave, multi-tab, or retries. Graph edits often touch multiple rows (e.g. remove a Connection and its Modulations). Transactions give atomicity; overlapping saves should additionally use a cheap optimistic check (`pipeline.version` or `updatedAt`) so last-write-wins is explicit rather than silent corruption. True co-editing (CRDT/OT) is out of scope until needed.
+
+**How we will enforce it (not yet implemented):**
+
+1. Hand-written (or touch) server helper, e.g. `withTransaction`
+2. Clay command-handler templates **always** call that helper — model/codegen encodes the pattern
+3. Agent rules/hooks only protect the boundary (don’t hand-edit generated handlers); they are not the primary enforcement
+
+**When:** implement with the first API/DB mutation generator — not before a DB client and command handlers exist. Until then, keep this as a standing constraint: new mutation surfaces must be designed to be transactional.
 
 v1 PoC reference: USGS → SSE sample stream → magnitude-to-frequency tone. Retain the *idea*; do not treat that repo’s structure as the target architecture.
 
