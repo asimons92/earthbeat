@@ -24,140 +24,13 @@ import {
   effectKindsByKey,
   modulatorDefaults,
   oscillatorDefaults,
-  usgsConnector,
 } from '@/generated/catalog';
-
-const noaaConnector = connectorKindsByKey.noaa_coops_tides;
-const noaaWaterChannel =
-  noaaConnector.channels.find((channel) => channel.key === 'waterLevel') ??
-  noaaConnector.channels[0]!;
-const noaaInMin =
-  'mapHintMin' in noaaWaterChannel && typeof noaaWaterChannel.mapHintMin === 'number'
-    ? noaaWaterChannel.mapHintMin
-    : 'min' in noaaWaterChannel && typeof noaaWaterChannel.min === 'number'
-      ? noaaWaterChannel.min
-      : -1;
-const noaaInMax =
-  'mapHintMax' in noaaWaterChannel && typeof noaaWaterChannel.mapHintMax === 'number'
-    ? noaaWaterChannel.mapHintMax
-    : 'max' in noaaWaterChannel && typeof noaaWaterChannel.max === 'number'
-      ? noaaWaterChannel.max
-      : 3;
 import { usePatchPersist } from '@/persist/usePatchPersist';
 import { usePatchRuntime } from '@/runtime/usePatchRuntime';
 import { type ConnectorFlowNode } from '@/nodes/ConnectorNode';
 import { type EffectFlowNode } from '@/nodes/EffectNode';
 import { type ModulatorFlowNode } from '@/nodes/ModulatorNode';
 import { type OscillatorFlowNode } from '@/nodes/OscillatorNode';
-
-const initialNodes: Node[] = [
-  {
-    id: 'connector-usgs',
-    type: 'connector',
-    position: { x: 40, y: 100 },
-    data: {
-      label: usgsConnector.label,
-      kindKey: usgsConnector.key,
-      status: 'M —',
-    },
-  },
-  {
-    id: 'modulator-mag-freq',
-    type: 'modulator',
-    position: { x: 280, y: 100 },
-    data: {
-      label: 'Magnitude → Frequency',
-      channelKey: modulatorDefaults.channelKey,
-      targetParam: modulatorDefaults.targetParam,
-      inMin: modulatorDefaults.inMin,
-      inMax: modulatorDefaults.inMax,
-      outMin: modulatorDefaults.outMin,
-      outMax: modulatorDefaults.outMax,
-      status: `${modulatorDefaults.inMin}–${modulatorDefaults.inMax} → ${modulatorDefaults.outMin}–${modulatorDefaults.outMax}`,
-    },
-  },
-  {
-    id: 'oscillator-sine',
-    type: 'oscillator',
-    position: { x: 540, y: 100 },
-    data: {
-      label: 'Sine Tone',
-      waveform: oscillatorDefaults.waveform,
-      frequencyHz: oscillatorDefaults.frequencyHz,
-      gain: oscillatorDefaults.gain,
-      status: `${oscillatorDefaults.frequencyHz} Hz`,
-    },
-  },
-  {
-    id: 'connector-noaa',
-    type: 'connector',
-    position: { x: 40, y: 280 },
-    data: {
-      label: noaaConnector.label,
-      kindKey: noaaConnector.key,
-      status: 'WL —',
-      interpolate: true,
-    },
-  },
-  {
-    id: 'modulator-tide-freq',
-    type: 'modulator',
-    position: { x: 280, y: 280 },
-    data: {
-      label: 'Water level → Frequency',
-      channelKey: noaaWaterChannel.key,
-      targetParam: modulatorDefaults.targetParam,
-      inMin: noaaInMin,
-      inMax: noaaInMax,
-      outMin: modulatorDefaults.outMin,
-      outMax: modulatorDefaults.outMax,
-      status: `${noaaInMin}–${noaaInMax} → ${modulatorDefaults.outMin}–${modulatorDefaults.outMax}`,
-    },
-  },
-  {
-    id: 'oscillator-tide',
-    type: 'oscillator',
-    position: { x: 540, y: 280 },
-    data: {
-      label: 'Tide Sine',
-      waveform: oscillatorDefaults.waveform,
-      frequencyHz: oscillatorDefaults.frequencyHz,
-      gain: oscillatorDefaults.gain,
-      status: `${oscillatorDefaults.frequencyHz} Hz`,
-    },
-  },
-];
-
-const initialEdges: Edge[] = [
-  {
-    id: 'wire-connector-modulator',
-    source: 'connector-usgs',
-    target: 'modulator-mag-freq',
-    sourceHandle: 'out',
-    targetHandle: 'in',
-  },
-  {
-    id: 'wire-modulator-oscillator',
-    source: 'modulator-mag-freq',
-    target: 'oscillator-sine',
-    sourceHandle: 'out',
-    targetHandle: 'in',
-  },
-  {
-    id: 'wire-noaa-modulator',
-    source: 'connector-noaa',
-    target: 'modulator-tide-freq',
-    sourceHandle: 'out',
-    targetHandle: 'in',
-  },
-  {
-    id: 'wire-tide-modulator-oscillator',
-    source: 'modulator-tide-freq',
-    target: 'oscillator-tide',
-    sourceHandle: 'out',
-    targetHandle: 'in',
-  },
-];
 
 function nextOffset(count: number) {
   return { x: 60 + (count % 5) * 36, y: 60 + (count % 5) * 36 };
@@ -189,6 +62,7 @@ type PatchWorkspaceValue = {
   createPatch: ReturnType<typeof usePatchPersist>['createPatch'];
   loadPatch: (id: string) => Promise<void>;
   newBlankPatch: () => void;
+  blankForSignOut: () => void;
   deletePatch: (id: string, expectedVersion: number) => Promise<{ wasActive: boolean }>;
   resolveConflictByReload: () => Promise<void>;
   liveStatus: ReturnType<typeof usePatchRuntime>['liveStatus'];
@@ -206,15 +80,16 @@ type PatchWorkspaceValue = {
 const PatchWorkspaceContext = createContext<PatchWorkspaceValue | null>(null);
 
 export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
-  const [nodes, setNodes, onNodesChangeBase] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChangeBase] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChangeBase] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   const persist = usePatchPersist({ nodes, edges, setNodes, setEdges });
   const {
-    scheduleAutosave,
+    scheduleDraftPersist,
     loadPatch: persistLoadPatch,
     newBlankPatch: persistNewBlankPatch,
+    blankForSignOut: persistBlankForSignOut,
     deletePatch: persistDeletePatch,
     resolveConflictByReload: persistResolveConflictByReload,
   } = persist;
@@ -249,6 +124,11 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
     persistNewBlankPatch();
   }, [persistNewBlankPatch, resetTransportForPatchLoad]);
 
+  const blankForSignOut = useCallback(() => {
+    resetTransportForPatchLoad();
+    persistBlankForSignOut();
+  }, [persistBlankForSignOut, resetTransportForPatchLoad]);
+
   const deletePatch = useCallback(
     async (id: string, expectedVersion: number) => {
       if (persist.activePatchId === id) {
@@ -265,8 +145,8 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
   }, [persistResolveConflictByReload, resetTransportForPatchLoad]);
 
   useEffect(() => {
-    scheduleAutosave();
-  }, [nodes, edges, scheduleAutosave]);
+    scheduleDraftPersist();
+  }, [nodes, edges, scheduleDraftPersist]);
 
   const onNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChangeBase>[0]) => {
@@ -453,6 +333,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       createPatch: persist.createPatch,
       loadPatch,
       newBlankPatch,
+      blankForSignOut,
       deletePatch,
       resolveConflictByReload,
       liveStatus,
@@ -492,6 +373,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       persist.createPatch,
       loadPatch,
       newBlankPatch,
+      blankForSignOut,
       deletePatch,
       resolveConflictByReload,
       liveStatus,

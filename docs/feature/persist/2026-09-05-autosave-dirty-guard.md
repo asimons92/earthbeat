@@ -1,7 +1,7 @@
 # Stop autosave status flicker
 
 Date: 2026-09-05
-Status: decided
+Status: superseded
 
 ## Context
 
@@ -17,4 +17,4 @@ A successful save must not schedule another save unless the user edits the graph
 
 ## Follow-up
 
-None.
+Database autosave is removed. See `2026-09-05-canvas-draft-vs-db-save.md` for browser draft vs Save.

@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { TRPCClientError } from '@trpc/client';
 
+import {
+  clearCanvasDraft,
+  readCanvasDraft,
+  writeCanvasDraft,
+  type CanvasDraftEdge,
+  type CanvasDraftNode,
+  type CanvasDraftPayload,
+} from '@/persist/canvasDraft';
 import { BLANK_PATCH_NAME } from '@/persist/patchFileActions';
 import { decideSessionBootstrap } from '@/persist/sessionBootstrap';
 import { domainGraphToFlow, flowToDomainGraph } from '@/persist/graphMapper';
@@ -16,7 +24,21 @@ type UsePatchPersistArgs = {
   setEdges: (edges: Edge[] | ((current: Edge[]) => Edge[])) => void;
 };
 
-type SaveReason = 'manual' | 'auto';
+function asDraftNodes(nodes: Node[]): CanvasDraftNode[] {
+  return nodes as unknown as CanvasDraftNode[];
+}
+
+function asDraftEdges(edges: Edge[]): CanvasDraftEdge[] {
+  return edges as unknown as CanvasDraftEdge[];
+}
+
+function asFlowNodes(nodes: ReadonlyArray<CanvasDraftNode>): Node[] {
+  return nodes as unknown as Node[];
+}
+
+function asFlowEdges(edges: ReadonlyArray<CanvasDraftEdge>): Edge[] {
+  return edges as unknown as Edge[];
+}
 
 export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPersistArgs) {
   const [activePatchId, setActivePatchId] = useState<string | null>(null);
@@ -26,14 +48,17 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const [isDirty, setIsDirty] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [authMode, setAuthMode] = useState('local');
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
   const versionRef = useRef(patchVersion);
   const patchIdRef = useRef(activePatchId);
+  const patchNameRef = useRef(activePatchName);
+  const userIdRef = useRef<string | null>(null);
   const dirtyRef = useRef(false);
   const saveInFlightRef = useRef(false);
   const ignoreNextGraphEffectRef = useRef(true);
+  const draftBootstrappedRef = useRef(false);
 
   const markClean = useCallback(() => {
     dirtyRef.current = false;
@@ -50,7 +75,8 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     edgesRef.current = edges;
     versionRef.current = patchVersion;
     patchIdRef.current = activePatchId;
-  }, [nodes, edges, patchVersion, activePatchId]);
+    patchNameRef.current = activePatchName;
+  }, [nodes, edges, patchVersion, activePatchId, activePatchName]);
 
   const utils = trpc.useUtils();
   const listQuery = trpc.patch.list.useQuery(undefined, { enabled: sessionReady });
@@ -77,6 +103,56 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     utils.patch.get.fetch,
   ]);
 
+  const buildDraftPayload = useCallback((dirty: boolean): CanvasDraftPayload => {
+    return {
+      activePatchId: patchIdRef.current,
+      activePatchName: patchNameRef.current,
+      patchVersion: versionRef.current,
+      isDirty: dirty,
+      nodes: asDraftNodes(nodesRef.current),
+      edges: asDraftEdges(edgesRef.current),
+    };
+  }, []);
+
+  const flushDraft = useCallback(
+    (dirty: boolean) => {
+      writeCanvasDraft(userIdRef.current, buildDraftPayload(dirty));
+    },
+    [buildDraftPayload],
+  );
+
+  const applyDraft = useCallback(
+    (draft: CanvasDraftPayload) => {
+      ignoreNextGraphEffectRef.current = true;
+      setActivePatchId(draft.activePatchId);
+      setActivePatchName(draft.activePatchName);
+      setPatchVersion(draft.patchVersion);
+      if (draft.isDirty) {
+        markDirty();
+      } else {
+        markClean();
+      }
+      setNodes(asFlowNodes(draft.nodes));
+      setEdges(asFlowEdges(draft.edges));
+      if (draft.activePatchId && !draft.isDirty) {
+        setPersistStatus('saved');
+      } else {
+        setPersistStatus('idle');
+      }
+    },
+    [markClean, markDirty, setEdges, setNodes],
+  );
+
+  const restoreDraftForUser = useCallback(
+    (userId: string | null) => {
+      const draft = readCanvasDraft(userId);
+      if (draft) {
+        applyDraft(draft);
+      }
+    },
+    [applyDraft],
+  );
+
   useEffect(() => {
     void (async () => {
       try {
@@ -91,7 +167,12 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           } catch {
             // Keep prior authMode.
           }
+          userIdRef.current = null;
           setSessionReady(false);
+          if (!draftBootstrappedRef.current) {
+            draftBootstrappedRef.current = true;
+            restoreDraftForUser(null);
+          }
           return;
         }
         const sessionBody = (await sessionResponse.json()) as {
@@ -105,7 +186,13 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           authMode: mode,
         });
         if (decision === 'ready') {
+          const userId = sessionBody.user?.id ?? null;
+          userIdRef.current = userId;
           setSessionReady(true);
+          if (!draftBootstrappedRef.current) {
+            draftBootstrappedRef.current = true;
+            restoreDraftForUser(userId);
+          }
           return;
         }
         if (decision === 'needsLocalPost') {
@@ -114,23 +201,46 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
             credentials: 'include',
           });
           if (!localResponse.ok) {
+            userIdRef.current = null;
             setSessionReady(false);
+            if (!draftBootstrappedRef.current) {
+              draftBootstrappedRef.current = true;
+              restoreDraftForUser(null);
+            }
             return;
           }
+          const localBody = (await localResponse.json()) as {
+            user?: { id?: string } | null;
+          };
+          const userId = localBody.user?.id ?? null;
+          userIdRef.current = userId;
           setSessionReady(true);
+          if (!draftBootstrappedRef.current) {
+            draftBootstrappedRef.current = true;
+            restoreDraftForUser(userId);
+          }
           return;
         }
+        userIdRef.current = null;
         setSessionReady(false);
+        if (!draftBootstrappedRef.current) {
+          draftBootstrappedRef.current = true;
+          restoreDraftForUser(null);
+        }
       } catch {
+        userIdRef.current = null;
         setSessionReady(false);
+        if (!draftBootstrappedRef.current) {
+          draftBootstrappedRef.current = true;
+          restoreDraftForUser(null);
+        }
       }
     })();
-  }, []);
+  }, [restoreDraftForUser]);
 
-  const saveNow = useCallback(async (reason: SaveReason = 'manual') => {
+  const saveNow = useCallback(async () => {
     const patchId = patchIdRef.current;
     if (!patchId) return;
-    if (reason === 'auto' && !dirtyRef.current) return;
     if (saveInFlightRef.current) return;
     saveInFlightRef.current = true;
     setPersistStatus('saving');
@@ -146,7 +256,9 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         wires: graph.wires,
       });
       setPatchVersion(Number(result.version));
+      versionRef.current = Number(result.version);
       markClean();
+      flushDraft(false);
       setPersistStatus('saved');
       await invalidateListRef.current();
     } catch (error) {
@@ -158,28 +270,29 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     } finally {
       saveInFlightRef.current = false;
     }
-  }, [markClean]);
+  }, [flushDraft, markClean]);
 
-  const scheduleAutosave = useCallback(() => {
+  const scheduleDraftPersist = useCallback(() => {
     if (ignoreNextGraphEffectRef.current) {
       ignoreNextGraphEffectRef.current = false;
-      markClean();
       return;
     }
     markDirty();
-    if (!patchIdRef.current) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      void saveNow('auto');
-    }, 1200);
-  }, [markClean, markDirty, saveNow]);
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      flushDraft(true);
+    }, 400);
+  }, [flushDraft, markDirty]);
 
   const createPatch = useCallback(
     async (name: string) => {
       const created = await createMutateRef.current({ name });
       setActivePatchId(created.id);
       setActivePatchName(created.name);
+      patchIdRef.current = created.id;
+      patchNameRef.current = created.name;
       setPatchVersion(Number(created.version));
+      versionRef.current = Number(created.version);
       const graph = flowToDomainGraph(created.id, nodesRef.current, edgesRef.current);
       const saved = await replaceMutateRef.current({
         id: created.id,
@@ -191,13 +304,15 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         wires: graph.wires,
       });
       setPatchVersion(Number(saved.version));
+      versionRef.current = Number(saved.version);
       markClean();
       ignoreNextGraphEffectRef.current = true;
+      flushDraft(false);
       setPersistStatus('saved');
       await invalidateListRef.current();
       return created;
     },
-    [markClean],
+    [flushDraft, markClean],
   );
 
   const loadPatch = useCallback(
@@ -217,22 +332,59 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
       markClean();
       setNodes(nextNodes);
       setEdges(nextEdges);
+      nodesRef.current = nextNodes;
+      edgesRef.current = nextEdges;
+      patchIdRef.current = patch.id;
+      patchNameRef.current = patch.name;
+      versionRef.current = Number(patch.version);
+      flushDraft(false);
       setPersistStatus('saved');
     },
-    [markClean, setEdges, setNodes],
+    [flushDraft, markClean, setEdges, setNodes],
   );
 
   const newBlankPatch = useCallback(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (draftTimer.current) clearTimeout(draftTimer.current);
     setActivePatchId(null);
     setActivePatchName(BLANK_PATCH_NAME);
     setPatchVersion(1);
+    patchIdRef.current = null;
+    patchNameRef.current = BLANK_PATCH_NAME;
+    versionRef.current = 1;
     ignoreNextGraphEffectRef.current = true;
     markClean();
     setNodes([]);
     setEdges([]);
+    nodesRef.current = [];
+    edgesRef.current = [];
+    clearCanvasDraft(userIdRef.current);
     setPersistStatus('idle');
   }, [markClean, setEdges, setNodes]);
+
+  const blankForSignOut = useCallback(() => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    // Keep stored draft for this user; only blank the live canvas.
+    const retainedUserId = userIdRef.current;
+    if (dirtyRef.current) {
+      flushDraft(true);
+    }
+    setActivePatchId(null);
+    setActivePatchName(BLANK_PATCH_NAME);
+    setPatchVersion(1);
+    patchIdRef.current = null;
+    patchNameRef.current = BLANK_PATCH_NAME;
+    versionRef.current = 1;
+    ignoreNextGraphEffectRef.current = true;
+    markClean();
+    setNodes([]);
+    setEdges([]);
+    nodesRef.current = [];
+    edgesRef.current = [];
+    userIdRef.current = null;
+    setSessionReady(false);
+    setPersistStatus('idle');
+    void retainedUserId;
+  }, [flushDraft, markClean, setEdges, setNodes]);
 
   const deletePatch = useCallback(
     async (id: string, expectedVersion: number) => {
@@ -262,11 +414,12 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     patchVersion,
     persistStatus,
     isDirty,
-    saveNow: () => saveNow('manual'),
-    scheduleAutosave,
+    saveNow,
+    scheduleDraftPersist,
     createPatch,
     loadPatch,
     newBlankPatch,
+    blankForSignOut,
     deletePatch,
     resolveConflictByReload,
     isLoadingList: listQuery.isLoading,

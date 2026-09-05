@@ -57,6 +57,7 @@ export function AppShell() {
     playAllOscillators,
     stopAllOscillators,
     newBlankPatch,
+    blankForSignOut,
   } = usePatchWorkspace();
 
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -220,6 +221,7 @@ export function AppShell() {
               variant="outline"
               size="sm"
               onClick={() => {
+                blankForSignOut();
                 void startSignOut().catch(() => {
                   window.alert('Sign out failed.');
                 });
