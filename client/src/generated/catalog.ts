@@ -191,6 +191,20 @@ export const shellPatchTabs = [
   }
 ] as const;
 
+export const shellAuthActions = [
+  {
+    "key": "google_sign_in",
+    "label": "Sign in with Google",
+    "provider": "google",
+    "path": "/api/auth/signin/google"
+  },
+  {
+    "key": "sign_out",
+    "label": "Sign out",
+    "path": "/api/auth/signout"
+  }
+] as const;
+
 export function getConnectorKind(kindKey: string) {
   if (kindKey in connectorKindsByKey) {
     return connectorKindsByKey[kindKey as ConnectorKindKey];

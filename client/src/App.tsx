@@ -19,10 +19,13 @@ import { Button } from '@/components/ui/button';
 import {
   modulatorDefaults,
   oscillatorDefaults,
+  shellAuthActions,
   shellCreateActions,
   shellPaletteCategories,
   usgsConnector,
 } from '@/generated/catalog';
+import { decideAuthChrome } from '@/persist/sessionBootstrap';
+import { startGoogleSignIn, startSignOut } from '@/persist/authActions';
 import { usePatchPersist } from '@/persist/usePatchPersist';
 import { usePatchRuntime } from '@/runtime/usePatchRuntime';
 import { ConnectorNode, type ConnectorFlowNode } from './nodes/ConnectorNode';
@@ -111,6 +114,7 @@ export default function App() {
 
   const {
     sessionReady,
+    authMode,
     patches,
     activePatchId,
     activePatchName,
@@ -121,6 +125,10 @@ export default function App() {
     loadPatch,
     resolveConflictByReload,
   } = usePatchPersist({ nodes, edges, setNodes, setEdges });
+
+  const authChrome = decideAuthChrome({ authMode, sessionReady });
+  const googleSignInAction = shellAuthActions.find((action) => action.key === 'google_sign_in');
+  const signOutAction = shellAuthActions.find((action) => action.key === 'sign_out');
 
   const {
     liveStatus,
@@ -322,6 +330,34 @@ export default function App() {
           </select>
         </label>
         <div className="shell__transport">
+          {authChrome === 'signIn' && googleSignInAction ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void startGoogleSignIn().catch(() => {
+                  window.alert('Google sign-in failed to start.');
+                });
+              }}
+            >
+              {googleSignInAction.label}
+            </Button>
+          ) : null}
+          {authChrome === 'signOut' && signOutAction ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void startSignOut().catch(() => {
+                  window.alert('Sign out failed.');
+                });
+              }}
+            >
+              {signOutAction.label}
+            </Button>
+          ) : null}
           <Button type="button" variant="outline" size="sm" onClick={() => void onSaveClick()}>
             Save
           </Button>

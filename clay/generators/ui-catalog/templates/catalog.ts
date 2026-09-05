@@ -44,6 +44,8 @@ export const shellPaletteCategories = <%- dump(shell.paletteCategories || []) %>
 
 export const shellPatchTabs = <%- dump(shell.patchTabs || []) %> as const;
 
+export const shellAuthActions = <%- dump(shell.authActions || []) %> as const;
+
 export function getConnectorKind(kindKey: string) {
   if (kindKey in connectorKindsByKey) {
     return connectorKindsByKey[kindKey as ConnectorKindKey];

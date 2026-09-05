@@ -42,6 +42,7 @@ export async function bootstrapLocalSession(): Promise<User> {
 export const authConfig: ExpressAuthConfig = {
   basePath: '/api/auth',
   secret: process.env.AUTH_SECRET,
+  trustHost: true,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,

@@ -21,6 +21,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const [patchVersion, setPatchVersion] = useState(1);
   const [persistStatus, setPersistStatus] = useState<PersistStatus>('idle');
   const [sessionReady, setSessionReady] = useState(false);
+  const [authMode, setAuthMode] = useState('local');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
@@ -51,9 +52,11 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           user?: { id?: string } | null;
           authMode?: string;
         };
+        const mode = sessionBody.authMode ?? 'local';
+        setAuthMode(mode);
         const decision = decideSessionBootstrap({
           user: sessionBody.user,
-          authMode: sessionBody.authMode ?? 'local',
+          authMode: mode,
         });
         if (decision === 'ready') {
           setSessionReady(true);
@@ -162,6 +165,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
 
   return {
     sessionReady,
+    authMode,
     patches: listQuery.data ?? [],
     activePatchId,
     activePatchName,

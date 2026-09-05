@@ -5,6 +5,8 @@ export type SessionBootstrapInput = {
   authMode: string;
 };
 
+export type AuthChromeKind = 'hidden' | 'signIn' | 'signOut';
+
 /**
  * Decide how the client should finish auth before Patch persist runs.
  */
@@ -12,4 +14,15 @@ export function decideSessionBootstrap(input: SessionBootstrapInput): SessionBoo
   if (input.user?.id) return 'ready';
   if (input.authMode === 'local') return 'needsLocalPost';
   return 'unauthenticated';
+}
+
+/**
+ * Shell auth controls: Google mode shows Sign in or Sign out. Local mode needs no chrome.
+ */
+export function decideAuthChrome(input: {
+  authMode: string;
+  sessionReady: boolean;
+}): AuthChromeKind {
+  if (input.authMode !== 'google') return 'hidden';
+  return input.sessionReady ? 'signOut' : 'signIn';
 }

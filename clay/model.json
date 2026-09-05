@@ -77,6 +77,19 @@
             "name": "Storm Rhythm",
             "active": false
           }
+        ],
+        "authActions": [
+          {
+            "key": "google_sign_in",
+            "label": "Sign in with Google",
+            "provider": "google",
+            "path": "/api/auth/signin/google"
+          },
+          {
+            "key": "sign_out",
+            "label": "Sign out",
+            "path": "/api/auth/signout"
+          }
         ]
       },
       "connectorKinds": [
