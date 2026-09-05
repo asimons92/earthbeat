@@ -203,7 +203,11 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   const persist = usePatchPersist({ nodes, edges, setNodes, setEdges });
-  const { scheduleAutosave } = persist;
+  const {
+    scheduleAutosave,
+    loadPatch: persistLoadPatch,
+    resolveConflictByReload: persistResolveConflictByReload,
+  } = persist;
 
   const {
     liveStatus,
@@ -218,8 +222,22 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
     stopOscillator,
     playAllOscillators,
     stopAllOscillators,
+    resetTransportForPatchLoad,
     isOscillatorPlaying,
   } = usePatchRuntime(nodes, edges);
+
+  const loadPatch = useCallback(
+    async (id: string) => {
+      resetTransportForPatchLoad();
+      await persistLoadPatch(id);
+    },
+    [persistLoadPatch, resetTransportForPatchLoad],
+  );
+
+  const resolveConflictByReload = useCallback(async () => {
+    resetTransportForPatchLoad();
+    await persistResolveConflictByReload();
+  }, [persistResolveConflictByReload, resetTransportForPatchLoad]);
 
   useEffect(() => {
     scheduleAutosave();
@@ -372,8 +390,8 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       persistStatus: persist.persistStatus,
       saveNow: persist.saveNow,
       createPatch: persist.createPatch,
-      loadPatch: persist.loadPatch,
-      resolveConflictByReload: persist.resolveConflictByReload,
+      loadPatch,
+      resolveConflictByReload,
       liveStatus,
       lastSample,
       lastSamplesByKind,
@@ -406,8 +424,8 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       persist.persistStatus,
       persist.saveNow,
       persist.createPatch,
-      persist.loadPatch,
-      persist.resolveConflictByReload,
+      loadPatch,
+      resolveConflictByReload,
       liveStatus,
       lastSample,
       lastSamplesByKind,

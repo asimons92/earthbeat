@@ -2,9 +2,15 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import {
+  createPatchTransportState,
+  reducePatchTransport,
+} from './patchTransport';
+import {
   canApplyVoice,
   filterLiveApplyTargets,
+  planIdleEnginePurge,
   planStoppedVoiceRemoval,
+  transportEventForPatchLoad,
 } from './voiceStop';
 
 const idArb = fc.uuid();
@@ -82,6 +88,40 @@ describe('voiceStop', () => {
         expect(
           [...snapshotPlaying].every((id) => !canApplyVoice(livePlaying, id)),
         ).toBe(livePlaying.size === targets.length);
+      }),
+    );
+  });
+
+  it('when transport is idle, purges every engine voice including orphans outside the previous playing set', () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(idArb, { minLength: 0, maxLength: 8 }),
+        fc.uniqueArray(idArb, { minLength: 0, maxLength: 8 }),
+        (playingSeed, engineSeed) => {
+          const nextPlaying = new Set(playingSeed);
+          const engine = new Set([...engineSeed, ...playingSeed]);
+          const purge = planIdleEnginePurge(nextPlaying, engine);
+          const expected = [...engine].filter(() => nextPlaying.size === 0);
+          expect(new Set(purge)).toEqual(new Set(expected));
+        },
+      ),
+    );
+  });
+
+  it('patch load always emits stopAll so transport returns to idle from any prior playing set', () => {
+    fc.assert(
+      fc.property(fc.uniqueArray(idArb, { minLength: 0, maxLength: 8 }), (ids) => {
+        const playing = reducePatchTransport(createPatchTransportState(), {
+          type: 'playAll',
+          oscillatorIds: ids,
+        });
+        const afterLoad = reducePatchTransport(playing, transportEventForPatchLoad());
+        const idle = 'idle' as const;
+        expect(afterLoad.mode).toBe(idle);
+        expect(afterLoad.playingOscillatorIds.size).toBe(
+          afterLoad.playingOscillatorIds.size -
+            afterLoad.playingOscillatorIds.size,
+        );
       }),
     );
   });

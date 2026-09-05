@@ -25,7 +25,9 @@ import { planVoiceCleanup } from './voiceCleanup';
 import {
   canApplyVoice,
   filterLiveApplyTargets,
+  planIdleEnginePurge,
   planStoppedVoiceRemoval,
+  transportEventForPatchLoad,
 } from './voiceStop';
 import { connectorKindKeysFromNodes, streamUrlsForKindKeys } from './streamUrls';
 
@@ -298,6 +300,13 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         await engine.removeVoice(id);
       }
 
+      for (const id of planIdleEnginePurge(
+        next.playingOscillatorIds,
+        new Set(engine.listVoiceIds()),
+      )) {
+        await engine.removeVoice(id);
+      }
+
       if (hold) {
         await applySamplesToVoices();
       }
@@ -341,6 +350,10 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
 
   const stopAllOscillators = useCallback(() => {
     dispatchTransport({ type: 'stopAll' });
+  }, [dispatchTransport]);
+
+  const resetTransportForPatchLoad = useCallback(() => {
+    dispatchTransport(transportEventForPatchLoad());
   }, [dispatchTransport]);
 
   useEffect(() => {
@@ -395,6 +408,7 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
     stopOscillator,
     playAllOscillators,
     stopAllOscillators,
+    resetTransportForPatchLoad,
     isOscillatorPlaying: (id: string) => transport.playingOscillatorIds.has(id),
   };
 }

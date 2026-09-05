@@ -1,6 +1,8 @@
 /**
  * Voices whose Oscillator left the graph must leave the Elementary mix.
  * Playing ids missing from the graph must stop first.
+ * Engine voices that are not in the playing set are orphans and must leave too;
+ * otherwise Stop (which only clears the playing set) cannot silence them.
  */
 export function planVoiceCleanup(
   graphOscillatorIds: ReadonlySet<string>,
@@ -13,7 +15,7 @@ export function planVoiceCleanup(
   }
   const removeIds: string[] = [];
   for (const id of engineVoiceIds) {
-    if (!graphOscillatorIds.has(id)) removeIds.push(id);
+    if (!graphOscillatorIds.has(id) || !playingIds.has(id)) removeIds.push(id);
   }
   return { stopIds, removeIds };
 }

@@ -4,6 +4,8 @@
  * resting (base) Oscillator params after the shared stream is cleared.
  */
 
+import type { PatchTransportEvent } from './patchTransport';
+
 /** Oscillator ids that left the playing set and must leave the engine mix. */
 export function planStoppedVoiceRemoval(
   prevPlaying: ReadonlySet<string>,
@@ -14,6 +16,25 @@ export function planStoppedVoiceRemoval(
     if (!nextPlaying.has(id)) removeIds.push(id);
   }
   return removeIds;
+}
+
+/**
+ * When transport is idle, every remaining engine voice must leave the mix.
+ * Covers orphans that were never in the previous playing snapshot.
+ */
+export function planIdleEnginePurge(
+  nextPlaying: ReadonlySet<string>,
+  engineVoiceIds: ReadonlySet<string>,
+): string[] {
+  if (nextPlaying.size > 0) return [];
+  return [...engineVoiceIds];
+}
+
+/**
+ * Loading a saved Patch must reset transport. Play must not carry across graphs.
+ */
+export function transportEventForPatchLoad(): PatchTransportEvent {
+  return { type: 'stopAll' };
 }
 
 /**
