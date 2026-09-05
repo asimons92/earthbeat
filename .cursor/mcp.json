@@ -3,6 +3,10 @@
     "clay": {
       "command": "clay-mcp",
       "args": []
+    },
+    "railway": {
+      "command": "railway",
+      "args": ["mcp"]
     }
   }
 }

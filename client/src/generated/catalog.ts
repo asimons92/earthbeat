@@ -128,6 +128,139 @@ export type ConnectorKindKey = keyof typeof connectorKindsByKey;
 
 export const usgsConnector = connectorKindsByKey['usgs_earthquakes'];
 
+export const effectKinds = [
+  {
+    "key": "scale_snap",
+    "label": "Scale Snap",
+    "description": "Snaps Oscillator Hertz to the nearest pitch in a tonic and named scale.",
+    "transforms": [
+      "frequencyHz"
+    ],
+    "defaultTonic": "C",
+    "defaultScaleKey": "major",
+    "defaultEnabled": true,
+    "a4Hz": 440
+  }
+] as const;
+
+export const effectKindsByKey = {
+
+  'scale_snap': effectKinds[0],
+
+} as const;
+
+export type EffectKindKey = keyof typeof effectKindsByKey;
+
+export const scaleSnapTonics = [
+  {
+    "key": "C",
+    "label": "C"
+  },
+  {
+    "key": "C#",
+    "label": "C#"
+  },
+  {
+    "key": "D",
+    "label": "D"
+  },
+  {
+    "key": "D#",
+    "label": "D#"
+  },
+  {
+    "key": "E",
+    "label": "E"
+  },
+  {
+    "key": "F",
+    "label": "F"
+  },
+  {
+    "key": "F#",
+    "label": "F#"
+  },
+  {
+    "key": "G",
+    "label": "G"
+  },
+  {
+    "key": "G#",
+    "label": "G#"
+  },
+  {
+    "key": "A",
+    "label": "A"
+  },
+  {
+    "key": "A#",
+    "label": "A#"
+  },
+  {
+    "key": "B",
+    "label": "B"
+  }
+] as const;
+
+export const scaleSnapScales = [
+  {
+    "key": "major",
+    "label": "Major",
+    "degrees": [
+      0,
+      2,
+      4,
+      5,
+      7,
+      9,
+      11
+    ]
+  },
+  {
+    "key": "natural_minor",
+    "label": "Natural minor",
+    "degrees": [
+      0,
+      2,
+      3,
+      5,
+      7,
+      8,
+      10
+    ]
+  },
+  {
+    "key": "major_pentatonic",
+    "label": "Major pentatonic",
+    "degrees": [
+      0,
+      2,
+      4,
+      7,
+      9
+    ]
+  },
+  {
+    "key": "minor_pentatonic",
+    "label": "Minor pentatonic",
+    "degrees": [
+      0,
+      3,
+      5,
+      7,
+      10
+    ]
+  }
+] as const;
+
+export const effectDefaults = {
+  "kindKey": "scale_snap",
+  "tonic": "C",
+  "scaleKey": "major",
+  "enabled": true,
+  "a4Hz": 440
+} as const;
+
 export const oscillatorDefaults = {
   "waveform": "sine",
   "frequencyHz": 220,
@@ -178,6 +311,11 @@ export const shellCreateActions = [
     "nodeType": "modulator"
   },
   {
+    "key": "addEffect",
+    "label": "New effect",
+    "nodeType": "effect"
+  },
+  {
     "key": "addOscillator",
     "label": "New oscillator",
     "nodeType": "oscillator"
@@ -223,6 +361,25 @@ export const shellAuthActions = [
   }
 ] as const;
 
+export const shellPatchFileActions = [
+  {
+    "key": "new",
+    "label": "New"
+  },
+  {
+    "key": "save",
+    "label": "Save"
+  },
+  {
+    "key": "saveAs",
+    "label": "Save As"
+  },
+  {
+    "key": "delete",
+    "label": "Delete"
+  }
+] as const;
+
 export const shellNavItems = [
   {
     "key": "canvas",
@@ -237,6 +394,12 @@ export const shellNavItems = [
     "listSource": "connectorKinds"
   },
   {
+    "key": "effectLibrary",
+    "label": "Effect Library",
+    "path": "/effects",
+    "listSource": "effectKinds"
+  },
+  {
     "key": "patchLibrary",
     "label": "Patch Library",
     "path": "/patches",
@@ -247,6 +410,13 @@ export const shellNavItems = [
 export function getConnectorKind(kindKey: string) {
   if (kindKey in connectorKindsByKey) {
     return connectorKindsByKey[kindKey as ConnectorKindKey];
+  }
+  return undefined;
+}
+
+export function getEffectKind(kindKey: string) {
+  if (kindKey in effectKindsByKey) {
+    return effectKindsByKey[kindKey as EffectKindKey];
   }
   return undefined;
 }

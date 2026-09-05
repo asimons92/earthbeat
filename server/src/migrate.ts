@@ -76,6 +76,20 @@ export async function ensureSchema(): Promise<void> {
     );
   `);
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS effects (
+      id text PRIMARY KEY,
+      patch_id text NOT NULL REFERENCES patches(id) ON DELETE CASCADE,
+      kind_key text NOT NULL,
+      label text,
+      position_x double precision NOT NULL,
+      position_y double precision NOT NULL,
+      tonic text NOT NULL,
+      scale_key text NOT NULL,
+      enabled boolean NOT NULL,
+      a4_hz double precision NOT NULL
+    );
+  `);
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS wires (
       id text PRIMARY KEY,
       patch_id text NOT NULL REFERENCES patches(id) ON DELETE CASCADE,

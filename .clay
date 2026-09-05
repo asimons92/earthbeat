@@ -7,28 +7,28 @@
       "output": ".",
       "generated_files": {
         "client/src/generated/catalog.ts": {
-          "md5": "511396b78b0787e7c1757ca327ded533",
-          "date": "2026-09-05T08:24:15.172Z"
+          "md5": "9e7b54d5927b3aea1fe76b136f9526e5",
+          "date": "2026-09-05T17:33:02.757Z"
         },
         "server/src/generated/types.ts": {
-          "md5": "ee8cba68983ea777221f6778c8609272",
-          "date": "2026-09-05T05:48:09.897Z"
+          "md5": "72e40441a92ef27b95efd5f2338244f9",
+          "date": "2026-09-05T17:12:58.787Z"
         },
         "server/src/generated/schema.ts": {
-          "md5": "a33f47b68df7424d42c1a7c9f16631ac",
-          "date": "2026-09-05T05:53:48.394Z"
+          "md5": "9c3090ab461650b1e20b84739217e3e3",
+          "date": "2026-09-05T17:12:58.799Z"
         },
         "server/src/generated/handlers.ts": {
-          "md5": "5da6d64b5d44d1efe68d8d3fd85d85b3",
-          "date": "2026-09-05T05:48:09.902Z"
+          "md5": "7776a893548f929b824cf3019efc9ace",
+          "date": "2026-09-05T17:12:58.801Z"
         },
         "server/src/generated/router.ts": {
-          "md5": "84a031610e7b53c286dc3ecc0f57928f",
-          "date": "2026-09-05T06:16:45.726Z"
+          "md5": "cc9d01f7a5823b7e0630f24455ab78ea",
+          "date": "2026-09-05T17:12:58.802Z"
         }
       },
-      "last_generated": "2026-09-05T08:24:15.172Z",
-      "input_hash": "8e1835595e623e215eca3fbba49e1a75"
+      "last_generated": "2026-09-05T17:33:02.757Z",
+      "input_hash": "79cc5b0127e7d31d8a904db9c6319eb7"
     }
   ]
 }

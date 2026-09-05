@@ -1,21 +1,21 @@
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
-import { getConnectorKind } from '@/generated/catalog';
+import { getEffectKind } from '@/generated/catalog';
 import { usePatchWorkspace } from '@/workspace/PatchWorkspace';
 
-export function ConnectorKindDetailPage() {
+export function EffectKindDetailPage() {
   const { kindKey = '' } = useParams();
   const navigate = useNavigate();
-  const { addConnector, activePatchId, sessionReady, createPatch, activePatchName } =
+  const { addEffect, activePatchId, sessionReady, createPatch, activePatchName } =
     usePatchWorkspace();
-  const kind = getConnectorKind(kindKey);
+  const kind = getEffectKind(kindKey);
 
   if (!kind) {
     return (
       <main className="shell__canvas library">
         <header className="library__header">
-          <h1 className="library__title">Unknown ConnectorKind</h1>
+          <h1 className="library__title">Unknown EffectKind</h1>
           <p className="library__lede">No catalog entry matches this key.</p>
         </header>
       </main>
@@ -28,9 +28,9 @@ export function ConnectorKindDetailPage() {
         await createPatch(activePatchName.trim() || 'Untitled Patch');
       }
     } catch {
-      // Still place the Connector locally if Patch create or save fails.
+      // Still place the Effect locally if Patch create or save fails.
     }
-    const added = addConnector(kind.key);
+    const added = addEffect(kind.key);
     if (added) {
       navigate('/');
     }
@@ -45,17 +45,13 @@ export function ConnectorKindDetailPage() {
           Add to canvas
         </Button>
       </header>
-      <section className="library__section" aria-label="Channels">
-        <h2 className="library__section-title">Channels</h2>
+      <section className="library__section" aria-label="Transforms">
+        <h2 className="library__section-title">Transforms</h2>
         <ul className="library__list">
-          {kind.channels.map((channel) => (
-            <li key={channel.key} className="library__row library__row--static">
-              <span className="library__row-label">{channel.label}</span>
-              <span className="library__row-desc">
-                {channel.key}
-                {'unit' in channel && channel.unit ? ` · ${channel.unit}` : ''}
-                {channel.modulatable ? ' · modulatable' : ''}
-              </span>
+          {kind.transforms.map((param) => (
+            <li key={param} className="library__row library__row--static">
+              <span className="library__row-label">{param}</span>
+              <span className="library__row-desc">Oscillator parameter</span>
             </li>
           ))}
         </ul>

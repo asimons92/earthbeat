@@ -22,6 +22,7 @@
       Connector: 'connectors',
       Modulator: 'modulators',
       Oscillator: 'oscillators',
+      Effect: 'effects',
       Wire: 'wires',
     };
     return map[typeName] || typeName.toLowerCase() + 's';
@@ -33,6 +34,7 @@
       Connector: 'connectors',
       Modulator: 'modulators',
       Oscillator: 'oscillators',
+      Effect: 'effects',
       Wire: 'wires',
     };
     return map[typeName] || typeName.charAt(0).toLowerCase() + typeName.slice(1) + 's';

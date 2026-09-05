@@ -9,6 +9,7 @@ import type { Db } from '../db.js';
 import { withTransaction } from '../db.js';
 import {
   connectors,
+  effects,
   modulators,
   oscillators,
   patches,
@@ -17,6 +18,7 @@ import {
 } from './schema.js';
 import type {
   Connector,
+  Effect,
   Modulator,
   Oscillator,
   Patch,
@@ -129,10 +131,11 @@ export async function patchList(userId: string): Promise<Patch[]> {
 export async function patchGet(userId: string, input: { id: string }): Promise<PatchWithGraph> {
   return withTransaction(async (db) => {
     const patch = await requireOwnedPatch(db, input.id, userId);
-    const [connectorRows, modulatorRows, oscillatorRows, wireRows] = await Promise.all([
+    const [connectorRows, modulatorRows, oscillatorRows, effectRows, wireRows] = await Promise.all([
       db.select().from(connectors).where(eq(connectors.patchId, input.id)),
       db.select().from(modulators).where(eq(modulators.patchId, input.id)),
       db.select().from(oscillators).where(eq(oscillators.patchId, input.id)),
+      db.select().from(effects).where(eq(effects.patchId, input.id)),
       db.select().from(wires).where(eq(wires.patchId, input.id)),
     ]);
     return {
@@ -140,6 +143,7 @@ export async function patchGet(userId: string, input: { id: string }): Promise<P
       connectors: connectorRows as unknown as Connector[],
       modulators: modulatorRows as unknown as Modulator[],
       oscillators: oscillatorRows as unknown as Oscillator[],
+      effects: effectRows as unknown as Effect[],
       wires: wireRows as unknown as Wire[],
     };
   });
@@ -178,6 +182,7 @@ export async function patchDelete(
       throw new VersionConflictError();
     }
     await db.delete(wires).where(eq(wires.patchId, input.id));
+    await db.delete(effects).where(eq(effects.patchId, input.id));
     await db.delete(modulators).where(eq(modulators.patchId, input.id));
     await db.delete(oscillators).where(eq(oscillators.patchId, input.id));
     await db.delete(connectors).where(eq(connectors.patchId, input.id));
@@ -198,6 +203,7 @@ export async function patchReplaceGraph(
     connectors: Connector[];
     modulators: Modulator[];
     oscillators: Oscillator[];
+    effects: Effect[];
     wires: Wire[];
   },
 ): Promise<PatchWithGraph> {
@@ -208,6 +214,7 @@ export async function patchReplaceGraph(
     }
 
     await db.delete(wires).where(eq(wires.patchId, input.id));
+    await db.delete(effects).where(eq(effects.patchId, input.id));
     await db.delete(modulators).where(eq(modulators.patchId, input.id));
     await db.delete(oscillators).where(eq(oscillators.patchId, input.id));
     await db.delete(connectors).where(eq(connectors.patchId, input.id));
@@ -231,6 +238,14 @@ export async function patchReplaceGraph(
     if (input.oscillators.length > 0) {
       await db.insert(oscillators).values(
         input.oscillators.map((row) => ({
+          ...row,
+          patchId: input.id,
+        })),
+      );
+    }
+    if (input.effects.length > 0) {
+      await db.insert(effects).values(
+        input.effects.map((row) => ({
           ...row,
           patchId: input.id,
         })),
@@ -260,6 +275,7 @@ export async function patchReplaceGraph(
       connectors: input.connectors,
       modulators: input.modulators,
       oscillators: input.oscillators,
+      effects: input.effects,
       wires: input.wires,
     };
   });

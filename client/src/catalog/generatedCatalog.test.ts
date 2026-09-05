@@ -56,7 +56,9 @@ describe('generated shell nav items', () => {
     expect(allLibraryNavItemsHavePaths(items)).toBe(
       items.every(
         (item) =>
-          item.listSource !== 'connectorKinds' && item.listSource !== 'patches'
+          item.listSource !== 'connectorKinds' &&
+          item.listSource !== 'effectKinds' &&
+          item.listSource !== 'patches'
             ? true
             : item.path.length > 0,
       ),

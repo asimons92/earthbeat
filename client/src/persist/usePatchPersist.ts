@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { TRPCClientError } from '@trpc/client';
 
+import { BLANK_PATCH_NAME } from '@/persist/patchFileActions';
 import { decideSessionBootstrap } from '@/persist/sessionBootstrap';
 import { domainGraphToFlow, flowToDomainGraph } from '@/persist/graphMapper';
 import { trpc } from '@/trpc';
@@ -19,9 +20,10 @@ type SaveReason = 'manual' | 'auto';
 
 export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPersistArgs) {
   const [activePatchId, setActivePatchId] = useState<string | null>(null);
-  const [activePatchName, setActivePatchName] = useState('Untitled Patch');
+  const [activePatchName, setActivePatchName] = useState(BLANK_PATCH_NAME);
   const [patchVersion, setPatchVersion] = useState(1);
   const [persistStatus, setPersistStatus] = useState<PersistStatus>('idle');
+  const [isDirty, setIsDirty] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [authMode, setAuthMode] = useState('local');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -31,7 +33,17 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const patchIdRef = useRef(activePatchId);
   const dirtyRef = useRef(false);
   const saveInFlightRef = useRef(false);
-  const ignoreNextGraphEffectRef = useRef(false);
+  const ignoreNextGraphEffectRef = useRef(true);
+
+  const markClean = useCallback(() => {
+    dirtyRef.current = false;
+    setIsDirty(false);
+  }, []);
+
+  const markDirty = useCallback(() => {
+    dirtyRef.current = true;
+    setIsDirty(true);
+  }, []);
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -44,17 +56,26 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const listQuery = trpc.patch.list.useQuery(undefined, { enabled: sessionReady });
   const createMutation = trpc.patch.create.useMutation();
   const replaceMutation = trpc.patch.replaceGraph.useMutation();
+  const deleteMutation = trpc.patch.delete.useMutation();
   const replaceMutateRef = useRef(replaceMutation.mutateAsync);
   const createMutateRef = useRef(createMutation.mutateAsync);
+  const deleteMutateRef = useRef(deleteMutation.mutateAsync);
   const invalidateListRef = useRef(utils.patch.list.invalidate);
   const fetchPatchRef = useRef(utils.patch.get.fetch);
 
   useEffect(() => {
     replaceMutateRef.current = replaceMutation.mutateAsync;
     createMutateRef.current = createMutation.mutateAsync;
+    deleteMutateRef.current = deleteMutation.mutateAsync;
     invalidateListRef.current = utils.patch.list.invalidate;
     fetchPatchRef.current = utils.patch.get.fetch;
-  }, [replaceMutation.mutateAsync, createMutation.mutateAsync, utils.patch.list.invalidate, utils.patch.get.fetch]);
+  }, [
+    replaceMutation.mutateAsync,
+    createMutation.mutateAsync,
+    deleteMutation.mutateAsync,
+    utils.patch.list.invalidate,
+    utils.patch.get.fetch,
+  ]);
 
   useEffect(() => {
     void (async () => {
@@ -121,10 +142,11 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         connectors: graph.connectors,
         modulators: graph.modulators,
         oscillators: graph.oscillators,
+        effects: graph.effects,
         wires: graph.wires,
       });
       setPatchVersion(Number(result.version));
-      dirtyRef.current = false;
+      markClean();
       setPersistStatus('saved');
       await invalidateListRef.current();
     } catch (error) {
@@ -136,21 +158,21 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     } finally {
       saveInFlightRef.current = false;
     }
-  }, []);
+  }, [markClean]);
 
   const scheduleAutosave = useCallback(() => {
-    if (!patchIdRef.current) return;
     if (ignoreNextGraphEffectRef.current) {
       ignoreNextGraphEffectRef.current = false;
-      dirtyRef.current = false;
+      markClean();
       return;
     }
-    dirtyRef.current = true;
+    markDirty();
+    if (!patchIdRef.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       void saveNow('auto');
     }, 1200);
-  }, [saveNow]);
+  }, [markClean, markDirty, saveNow]);
 
   const createPatch = useCallback(
     async (name: string) => {
@@ -165,16 +187,17 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         connectors: graph.connectors,
         modulators: graph.modulators,
         oscillators: graph.oscillators,
+        effects: graph.effects,
         wires: graph.wires,
       });
       setPatchVersion(Number(saved.version));
-      dirtyRef.current = false;
+      markClean();
       ignoreNextGraphEffectRef.current = true;
       setPersistStatus('saved');
       await invalidateListRef.current();
       return created;
     },
-    [],
+    [markClean],
   );
 
   const loadPatch = useCallback(
@@ -187,15 +210,41 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         connectors: patch.connectors,
         modulators: patch.modulators,
         oscillators: patch.oscillators,
+        effects: patch.effects ?? [],
         wires: patch.wires,
       });
       ignoreNextGraphEffectRef.current = true;
-      dirtyRef.current = false;
+      markClean();
       setNodes(nextNodes);
       setEdges(nextEdges);
       setPersistStatus('saved');
     },
-    [setEdges, setNodes],
+    [markClean, setEdges, setNodes],
+  );
+
+  const newBlankPatch = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setActivePatchId(null);
+    setActivePatchName(BLANK_PATCH_NAME);
+    setPatchVersion(1);
+    ignoreNextGraphEffectRef.current = true;
+    markClean();
+    setNodes([]);
+    setEdges([]);
+    setPersistStatus('idle');
+  }, [markClean, setEdges, setNodes]);
+
+  const deletePatch = useCallback(
+    async (id: string, expectedVersion: number) => {
+      const wasActive = patchIdRef.current === id;
+      await deleteMutateRef.current({ id, expectedVersion });
+      await invalidateListRef.current();
+      if (wasActive) {
+        newBlankPatch();
+      }
+      return { wasActive };
+    },
+    [newBlankPatch],
   );
 
   const resolveConflictByReload = useCallback(async () => {
@@ -212,10 +261,13 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     activePatchName,
     patchVersion,
     persistStatus,
+    isDirty,
     saveNow: () => saveNow('manual'),
     scheduleAutosave,
     createPatch,
     loadPatch,
+    newBlankPatch,
+    deletePatch,
     resolveConflictByReload,
     isLoadingList: listQuery.isLoading,
   };

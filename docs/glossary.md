@@ -16,11 +16,15 @@ Channel is one numeric output of a ConnectorKind. Example: `mag` (magnitude) on 
 
 Connector Library is the route that lists every ConnectorKind in the Clay catalog. Path: `/connectors`. Kind detail lives at `/connectors/:kindKey`.
 
+Effect Library is the route that lists every EffectKind in the Clay catalog. Path: `/effects`. Kind detail lives at `/effects/:kindKey`.
+
 Patch Library is the route that lists Patches owned by the signed-in User. Path: `/patches`. A row opens that Patch on the canvas.
 
 Modulator is a canvas node that maps a Channel onto an Oscillator parameter. Example: `mag` to frequency with ratios of the Oscillator base. React Flow edges between nodes are plain Wires. They do not store mapping data.
 
 Oscillator is a canvas node that makes sound. The catalog default waveform is sine.
+
+Effect is a canvas node that transforms a control signal on the path into an Oscillator. The first EffectKind is Scale Snap: it snaps Hertz to the nearest equal-temperament pitch in a chosen tonic and named scale. When Enable is off, Hertz passes through unchanged.
 
 Wire is a plain edge between two canvas nodes in a Patch. It stores source and target node ids and optional handles. It does not store mapping data.
 
@@ -34,7 +38,7 @@ upsertFromAuth creates or updates a User from a provider profile on the server (
 
 create, rename, delete, list, get, and replaceGraph act on a Patch. replaceGraph saves the full node and Wire set in one transaction and bumps Patch.version.
 
-add, move, updateConfig or updateParams or updateMapping, and remove act on Connector, Modulator, Oscillator, and Wire nodes.
+add, move, updateConfig or updateParams or updateMapping, and remove act on Connector, Modulator, Oscillator, Effect, and Wire nodes.
 
 ## Name clashes
 
@@ -49,5 +53,7 @@ Do not put mapping parameters on React Flow edges. Mapping belongs on a Modulato
 `noaa_coops_tides` is the second ConnectorKind. It uses the NOAA CO-OPS Data Retrieval API with product `water_level`. The default station is `9414290` (San Francisco). Modulatable channel is `waterLevel`. Display channels include `time` and `stationId`. The server polls about every six minutes and scrubs a recent window into a slow loop over SSE at `/api/tides/stream`.
 
 Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with Elementary as the audio runtime. Modulatable params are `frequencyHz` and `gain`.
+
+Scale Snap Effect defaults are tonic `C`, scale `major`, enabled on, and A4 at `440` Hz. Catalog scales are major, natural minor, major pentatonic, and minor pentatonic.
 
 Modulator defaults map `mag` to `frequencyHz` with in range 1 to 8 and out ratio range 0.5× to 4× of the Oscillator base frequency.

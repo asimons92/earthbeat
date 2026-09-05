@@ -8,6 +8,7 @@ import {
   type EarthquakeSample,
 } from './resolveVoiceParams';
 import type { RuntimeEdge, RuntimeNode } from './modulationChain';
+import { snapFrequencyToScale } from './scaleSnap';
 
 const idArb = fc.uuid();
 const sampleArb = fc.record({
@@ -222,6 +223,77 @@ describe('resolveVoiceParams', () => {
           );
         },
       ),
+    );
+  });
+
+  it('applies Scale Snap Effect Hertz after modulation', () => {
+    fc.assert(
+      fc.property(idArb, idArb, idArb, idArb, sampleArb, audioHz, (
+        connId,
+        modId,
+        effectId,
+        oscId,
+        sample,
+        restingFreq,
+      ) => {
+        fc.pre(new Set([connId, modId, effectId, oscId]).size === 4);
+        const inMin = 1;
+        const inMax = 8;
+        const outMin = 0.5;
+        const outMax = 4;
+        const nodes: RuntimeNode[] = [
+          { id: connId, type: 'connector', data: { kindKey: 'usgs_earthquakes' } },
+          {
+            id: modId,
+            type: 'modulator',
+            data: {
+              channelKey: 'mag',
+              targetParam: 'frequencyHz',
+              inMin,
+              inMax,
+              outMin,
+              outMax,
+            },
+          },
+          {
+            id: effectId,
+            type: 'effect',
+            data: {
+              kindKey: 'scale_snap',
+              tonic: 'C',
+              scaleKey: 'major',
+              enabled: true,
+              a4Hz: 440,
+            },
+          },
+          {
+            id: oscId,
+            type: 'oscillator',
+            data: { frequencyHz: restingFreq, gain: 0.2, waveform: 'sine' },
+          },
+        ];
+        const edges: RuntimeEdge[] = [
+          { id: 'a', source: connId, target: modId },
+          { id: 'b', source: modId, target: effectId },
+          { id: 'c', source: effectId, target: oscId },
+        ];
+        const params = resolveVoiceParams(nodes, edges, oscId, sample);
+        const preSnap = modulateFrequencyFromBase(
+          sample.mag,
+          inMin,
+          inMax,
+          outMin,
+          outMax,
+          restingFreq,
+        );
+        const expected = snapFrequencyToScale(preSnap, {
+          tonic: 'C',
+          scaleKey: 'major',
+          enabled: true,
+          a4Hz: 440,
+        });
+        expect(params.frequencyHz).toBe(expected);
+      }),
     );
   });
 });

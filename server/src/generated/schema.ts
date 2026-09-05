@@ -4,6 +4,8 @@
 
 import {
 
+  boolean,
+
   doublePrecision,
 
   integer,
@@ -103,6 +105,31 @@ export const oscillators = pgTable('oscillators', {
 });
 
 
+export const effects = pgTable('effects', {
+
+  id: text('id').notNull().primaryKey(),
+
+  patchId: text('patch_id').notNull(),
+
+  kindKey: text('kind_key').notNull(),
+
+  label: text('label'),
+
+  positionX: doublePrecision('position_x').notNull(),
+
+  positionY: doublePrecision('position_y').notNull(),
+
+  tonic: text('tonic').notNull(),
+
+  scaleKey: text('scale_key').notNull(),
+
+  enabled: boolean('enabled').notNull(),
+
+  a4Hz: doublePrecision('a4_hz').notNull(),
+
+});
+
+
 export const modulators = pgTable('modulators', {
 
   id: text('id').notNull().primaryKey(),
@@ -157,6 +184,8 @@ export const schema = {
   connectors,
 
   oscillators,
+
+  effects,
 
   modulators,
 

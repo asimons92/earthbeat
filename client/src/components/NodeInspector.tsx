@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -12,9 +13,12 @@ import {
 } from '@/components/ui/select';
 import {
   getConnectorKind,
+  getEffectKind,
   modulatableChannelsForKind,
   oscillatorDefaults,
   oscillatorModulatableParams,
+  scaleSnapScales,
+  scaleSnapTonics,
   usgsConnector,
 } from '@/generated/catalog';
 
@@ -41,18 +45,70 @@ function modulatorLabel(channelKey: string, targetParam: string) {
   return `${left} → ${right}`;
 }
 
+function effectStatus(tonic: string, scaleKey: string, enabled: boolean) {
+  if (!enabled) return 'bypassed';
+  const scale = scaleSnapScales.find((entry) => entry.key === scaleKey);
+  return `${tonic} ${scale?.label ?? scaleKey}`;
+}
+
+function walkDownstreamOscillator(
+  startId: string,
+  nodes: Node[],
+  edges: Edge[],
+): Node | null {
+  let cursor = startId;
+  const visited = new Set<string>();
+  while (true) {
+    if (visited.has(cursor)) return null;
+    visited.add(cursor);
+    const outbound = edges.find((edge) => edge.source === cursor);
+    if (!outbound) return null;
+    const next = nodes.find((entry) => entry.id === outbound.target);
+    if (!next) return null;
+    if (next.type === 'oscillator') return next;
+    if (next.type === 'effect') {
+      cursor = next.id;
+      continue;
+    }
+    return null;
+  }
+}
+
 type NodeInspectorProps = {
   nodes: Node[];
   edges: Edge[];
   selectedNodeId: string | null;
   onChangeNodeData: (nodeId: string, data: Record<string, unknown>) => void;
+  onRemoveNode: (nodeId: string) => void;
 };
+
+function RemoveControl({
+  nodeId,
+  onRemoveNode,
+}: {
+  nodeId: string;
+  onRemoveNode: (nodeId: string) => void;
+}) {
+  return (
+    <div className="inspector__field">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onRemoveNode(nodeId)}
+      >
+        Remove node
+      </Button>
+    </div>
+  );
+}
 
 export function NodeInspector({
   nodes,
   edges,
   selectedNodeId,
   onChangeNodeData,
+  onRemoveNode,
 }: NodeInspectorProps) {
   const selected = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -70,11 +126,7 @@ export function NodeInspector({
 
   const downstreamOscillator = useMemo(() => {
     if (!selected || selected.type !== 'modulator') return null;
-    const outbound = edges.find((edge) => edge.source === selected.id);
-    if (!outbound) return null;
-    const node = nodes.find((entry) => entry.id === outbound.target);
-    if (!node || node.type !== 'oscillator') return null;
-    return node;
+    return walkDownstreamOscillator(selected.id, nodes, edges);
   }, [edges, nodes, selected]);
 
   const channelOptions = useMemo(() => {
@@ -179,7 +231,7 @@ export function NodeInspector({
               </SelectContent>
             </Select>
           ) : (
-            <p className="inspector__empty">Wire this Modulator into an Oscillator.</p>
+            <p className="inspector__empty">Wire this Modulator into an Oscillator (Effects allowed in between).</p>
           )}
         </div>
 
@@ -230,6 +282,7 @@ export function NodeInspector({
             />
           </div>
         </div>
+        <RemoveControl nodeId={selected.id} onRemoveNode={onRemoveNode} />
       </aside>
     );
   }
@@ -283,6 +336,90 @@ export function NodeInspector({
               ))}
           </ul>
         </div>
+        <RemoveControl nodeId={selected.id} onRemoveNode={onRemoveNode} />
+      </aside>
+    );
+  }
+
+  if (selected.type === 'effect') {
+    const data = selected.data as {
+      label: string;
+      kindKey: string;
+      tonic: string;
+      scaleKey: string;
+      enabled: boolean;
+      a4Hz: number;
+      status: string;
+    };
+    const kind = getEffectKind(data.kindKey);
+
+    const patchEffect = (patch: Partial<typeof data>) => {
+      const next = { ...data, ...patch };
+      next.status = effectStatus(next.tonic, next.scaleKey, next.enabled);
+      onChangeNodeData(selected.id, next);
+    };
+
+    return (
+      <aside className="shell__inspector" aria-label="Node inspector">
+        <div className="inspector__title">Effect</div>
+        <p className="inspector__hint">{data.label}</p>
+        <div className="inspector__field">
+          <Label>Effect kind</Label>
+          <p className="inspector__readonly">{kind?.label ?? data.kindKey}</p>
+        </div>
+        <div className="inspector__field">
+          <Label htmlFor="effect-enabled">Enable</Label>
+          <label className="inspector__check" htmlFor="effect-enabled">
+            <input
+              id="effect-enabled"
+              type="checkbox"
+              checked={data.enabled}
+              onChange={(event) => patchEffect({ enabled: event.target.checked })}
+            />
+            <span>Snap Hertz when on (bypass when off)</span>
+          </label>
+        </div>
+        <div className="inspector__field">
+          <Label htmlFor="effect-tonic">Tonic</Label>
+          <Select
+            value={data.tonic}
+            onValueChange={(value) => {
+              if (value) patchEffect({ tonic: value });
+            }}
+          >
+            <SelectTrigger id="effect-tonic" size="sm">
+              <SelectValue placeholder="Tonic" />
+            </SelectTrigger>
+            <SelectContent>
+              {scaleSnapTonics.map((tonic) => (
+                <SelectItem key={tonic.key} value={tonic.key}>
+                  {tonic.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="inspector__field">
+          <Label htmlFor="effect-scale">Scale</Label>
+          <Select
+            value={data.scaleKey}
+            onValueChange={(value) => {
+              if (value) patchEffect({ scaleKey: value });
+            }}
+          >
+            <SelectTrigger id="effect-scale" size="sm">
+              <SelectValue placeholder="Scale" />
+            </SelectTrigger>
+            <SelectContent>
+              {scaleSnapScales.map((scale) => (
+                <SelectItem key={scale.key} value={scale.key}>
+                  {scale.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <RemoveControl nodeId={selected.id} onRemoveNode={onRemoveNode} />
       </aside>
     );
   }
@@ -343,6 +480,7 @@ export function NodeInspector({
             }}
           />
         </div>
+        <RemoveControl nodeId={selected.id} onRemoveNode={onRemoveNode} />
       </aside>
     );
   }

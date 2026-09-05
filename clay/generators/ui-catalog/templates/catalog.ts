@@ -1,5 +1,6 @@
 <%
   const kinds = catalog.connectorKinds || [];
+  const effectKinds = catalog.effectKinds || [];
   const oscillator = (types || []).find((entry) => entry.name === 'Oscillator');
   const oscillatorModulatableParams = (oscillator?.fields || [])
     .filter((field) => field.modulatable)
@@ -32,6 +33,22 @@ export type ConnectorKindKey = keyof typeof connectorKindsByKey;
 
 export const usgsConnector = connectorKindsByKey['usgs_earthquakes'];
 
+export const effectKinds = <%- dump(effectKinds) %> as const;
+
+export const effectKindsByKey = {
+<% effectKinds.forEach((kind, index) => { %>
+  '<%= kind.key %>': effectKinds[<%= index %>],
+<% }); %>
+} as const;
+
+export type EffectKindKey = keyof typeof effectKindsByKey;
+
+export const scaleSnapTonics = <%- dump(catalog.scaleSnapTonics || []) %> as const;
+
+export const scaleSnapScales = <%- dump(catalog.scaleSnapScales || []) %> as const;
+
+export const effectDefaults = <%- dump(catalog.effectDefaults) %> as const;
+
 export const oscillatorDefaults = <%- dump(catalog.oscillatorDefaults) %> as const;
 
 export const modulatorDefaults = <%- dump(catalog.modulatorDefaults) %> as const;
@@ -46,11 +63,20 @@ export const shellPatchTabs = <%- dump(shell.patchTabs || []) %> as const;
 
 export const shellAuthActions = <%- dump(shell.authActions || []) %> as const;
 
+export const shellPatchFileActions = <%- dump(shell.patchFileActions || []) %> as const;
+
 export const shellNavItems = <%- dump(shell.navItems || []) %> as const;
 
 export function getConnectorKind(kindKey: string) {
   if (kindKey in connectorKindsByKey) {
     return connectorKindsByKey[kindKey as ConnectorKindKey];
+  }
+  return undefined;
+}
+
+export function getEffectKind(kindKey: string) {
+  if (kindKey in effectKindsByKey) {
+    return effectKindsByKey[kindKey as EffectKindKey];
   }
   return undefined;
 }

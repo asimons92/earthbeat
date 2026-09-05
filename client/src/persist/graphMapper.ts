@@ -44,6 +44,19 @@ export type DomainOscillator = {
   gain: number;
 };
 
+export type DomainEffect = {
+  id: string;
+  patchId: string;
+  kindKey: string;
+  label?: string;
+  positionX: number;
+  positionY: number;
+  tonic: string;
+  scaleKey: string;
+  enabled: boolean;
+  a4Hz: number;
+};
+
 export type DomainWire = {
   id: string;
   patchId: string;
@@ -57,6 +70,7 @@ export type DomainGraph = {
   connectors: DomainConnector[];
   modulators: DomainModulator[];
   oscillators: DomainOscillator[];
+  effects: DomainEffect[];
   wires: DomainWire[];
 };
 
@@ -64,6 +78,7 @@ export function flowToDomainGraph(patchId: string, nodes: Node[], edges: Edge[])
   const connectors: DomainConnector[] = [];
   const modulators: DomainModulator[] = [];
   const oscillators: DomainOscillator[] = [];
+  const effects: DomainEffect[] = [];
 
   for (const node of nodes) {
     const data = node.data as Record<string, unknown>;
@@ -107,6 +122,19 @@ export function flowToDomainGraph(patchId: string, nodes: Node[], edges: Edge[])
         frequencyHz: Number(data.frequencyHz),
         gain: Number(data.gain),
       });
+    } else if (node.type === 'effect') {
+      effects.push({
+        id: node.id,
+        patchId,
+        kindKey: String(data.kindKey ?? 'scale_snap'),
+        label: typeof data.label === 'string' ? data.label : undefined,
+        positionX: node.position.x,
+        positionY: node.position.y,
+        tonic: String(data.tonic ?? 'C'),
+        scaleKey: String(data.scaleKey ?? 'major'),
+        enabled: typeof data.enabled === 'boolean' ? data.enabled : true,
+        a4Hz: typeof data.a4Hz === 'number' ? data.a4Hz : 440,
+      });
     }
   }
 
@@ -119,7 +147,7 @@ export function flowToDomainGraph(patchId: string, nodes: Node[], edges: Edge[])
     targetHandle: edge.targetHandle ?? undefined,
   }));
 
-  return { connectors, modulators, oscillators, wires };
+  return { connectors, modulators, oscillators, effects, wires };
 }
 
 export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: Edge[] } {
@@ -165,6 +193,20 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
         frequencyHz: row.frequencyHz,
         gain: row.gain,
         status: `${row.frequencyHz} Hz`,
+      },
+    })),
+    ...(graph.effects ?? []).map((row) => ({
+      id: row.id,
+      type: 'effect' as const,
+      position: { x: row.positionX, y: row.positionY },
+      data: {
+        label: row.label ?? 'Scale Snap',
+        kindKey: row.kindKey,
+        tonic: row.tonic,
+        scaleKey: row.scaleKey,
+        enabled: row.enabled,
+        a4Hz: row.a4Hz,
+        status: row.enabled ? `${row.tonic} ${row.scaleKey}` : 'bypassed',
       },
     })),
   ];

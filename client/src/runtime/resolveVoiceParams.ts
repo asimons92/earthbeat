@@ -1,10 +1,15 @@
 import { mapChannelOrRest, mapRange } from './mapRange';
-import { findModulationChain, type RuntimeEdge, type RuntimeNode } from './modulationChain';
+import {
+  findVoiceGraph,
+  type RuntimeEdge,
+  type RuntimeNode,
+} from './modulationChain';
 import {
   channelFromSample,
   type ConnectorSample,
   type UsgsConnectorSample,
 } from './channelFromSample';
+import { applyScaleSnapChain, MIN_AUDIBLE_HZ } from './scaleSnap';
 
 export type { ConnectorSample, NoaaConnectorSample, UsgsConnectorSample } from './channelFromSample';
 export { channelFromSample } from './channelFromSample';
@@ -20,7 +25,7 @@ export type VoiceParams = {
   modulated: boolean;
 };
 
-const MIN_AUDIBLE_HZ = 20;
+export type SamplesByKind = Partial<Record<string, ConnectorSample | EarthquakeSample>>;
 
 /**
  * Map a channel onto a ratio range, then multiply the Oscillator base frequency.
@@ -57,59 +62,111 @@ function normalizeSample(sample: ConnectorSample | EarthquakeSample | null): Con
   };
 }
 
+function samplesMapFrom(
+  sampleOrMap: SamplesByKind | ConnectorSample | EarthquakeSample | null,
+): SamplesByKind {
+  if (!sampleOrMap) return {};
+  const asRecord = sampleOrMap as Record<string, unknown>;
+  const looksLikeSingleSample =
+    typeof asRecord.id === 'string' &&
+    !('usgs_earthquakes' in asRecord) &&
+    !('noaa_coops_tides' in asRecord);
+  if (looksLikeSingleSample) {
+    const normalized = normalizeSample(sampleOrMap as ConnectorSample | EarthquakeSample);
+    if (!normalized) return {};
+    return { [normalized.kindKey]: normalized };
+  }
+  return sampleOrMap as SamplesByKind;
+}
+
+function mapChainChannel(
+  chain: {
+    connector: RuntimeNode;
+    channelKey: string;
+  },
+  sample: ConnectorSample,
+): { matched: boolean; channelValue: number | null } {
+  const connectorKind =
+    typeof chain.connector.data.kindKey === 'string' ? chain.connector.data.kindKey : '';
+  if (connectorKind.length === 0 || sample.kindKey !== connectorKind) {
+    return { matched: false, channelValue: null };
+  }
+  return {
+    matched: true,
+    channelValue: channelFromSample(sample, chain.channelKey, {
+      interpolate:
+        typeof chain.connector.data.interpolate === 'boolean'
+          ? chain.connector.data.interpolate
+          : true,
+    }),
+  };
+}
+
+function sampleForConnector(
+  chain: { connector: RuntimeNode },
+  samplesByKind: SamplesByKind,
+): ConnectorSample | null {
+  const kindKey =
+    typeof chain.connector.data.kindKey === 'string' ? chain.connector.data.kindKey : '';
+  if (kindKey.length === 0) return null;
+  return normalizeSample(samplesByKind[kindKey] ?? null);
+}
+
 export function resolveVoiceParams(
   nodes: RuntimeNode[],
   edges: RuntimeEdge[],
   oscillatorId: string,
-  sample: ConnectorSample | EarthquakeSample | null,
+  sampleOrMap: SamplesByKind | ConnectorSample | EarthquakeSample | null,
 ): VoiceParams {
-  const chain = findModulationChain(nodes, edges, oscillatorId);
-  const oscData = chain.oscillator.data;
+  const graph = findVoiceGraph(nodes, edges, oscillatorId);
+  const oscData = graph.oscillator.data;
   const restingFreq =
     typeof oscData.frequencyHz === 'number' ? oscData.frequencyHz : 220;
   const restingGain = typeof oscData.gain === 'number' ? oscData.gain : 0.2;
-  const resting = { frequencyHz: restingFreq, gain: restingGain, modulated: false };
 
-  if (!chain.complete || !sample) {
-    return resting;
+  let frequencyHz = restingFreq;
+  let gain = restingGain;
+  let modulated = false;
+
+  const samplesByKind = samplesMapFrom(sampleOrMap);
+
+  if (graph.frequencyChain) {
+    const sample = sampleForConnector(graph.frequencyChain, samplesByKind);
+    if (sample) {
+      const mapped = mapChainChannel(graph.frequencyChain, sample);
+      if (mapped.matched) {
+        frequencyHz = modulateFrequencyFromBase(
+          mapped.channelValue,
+          graph.frequencyChain.inMin,
+          graph.frequencyChain.inMax,
+          graph.frequencyChain.outMin,
+          graph.frequencyChain.outMax,
+          restingFreq,
+        );
+        modulated = true;
+      }
+    }
   }
 
-  const normalized = normalizeSample(sample);
-  if (!normalized) return resting;
-
-  const connectorKind =
-    typeof chain.connector.data.kindKey === 'string' ? chain.connector.data.kindKey : '';
-  if (connectorKind.length === 0 || normalized.kindKey !== connectorKind) {
-    return resting;
+  if (graph.gainChain) {
+    const sample = sampleForConnector(graph.gainChain, samplesByKind);
+    if (sample) {
+      const mapped = mapChainChannel(graph.gainChain, sample);
+      if (mapped.matched) {
+        gain = mapChannelOrRest(
+          mapped.channelValue,
+          graph.gainChain.inMin,
+          graph.gainChain.inMax,
+          graph.gainChain.outMin,
+          graph.gainChain.outMax,
+          restingGain,
+        );
+        modulated = true;
+      }
+    }
   }
 
-  const channelValue = channelFromSample(normalized, chain.channelKey, {
-    interpolate:
-      typeof chain.connector.data.interpolate === 'boolean'
-        ? chain.connector.data.interpolate
-        : true,
-  });
+  frequencyHz = applyScaleSnapChain(frequencyHz, graph.frequencyEffects);
 
-  if (chain.targetParam === 'gain') {
-    const mappedGain = mapChannelOrRest(
-      channelValue,
-      chain.inMin,
-      chain.inMax,
-      chain.outMin,
-      chain.outMax,
-      restingGain,
-    );
-    return { frequencyHz: restingFreq, gain: mappedGain, modulated: true };
-  }
-
-  const frequencyHz = modulateFrequencyFromBase(
-    channelValue,
-    chain.inMin,
-    chain.inMax,
-    chain.outMin,
-    chain.outMax,
-    restingFreq,
-  );
-
-  return { frequencyHz, gain: restingGain, modulated: true };
+  return { frequencyHz, gain, modulated };
 }

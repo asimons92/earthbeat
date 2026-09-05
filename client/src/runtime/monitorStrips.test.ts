@@ -102,6 +102,46 @@ describe('listMonitorStrips', () => {
     );
   });
 
+  it('still lists Channel strips when Effects sit between Modulator and Oscillator', () => {
+    fc.assert(
+      fc.property(
+        idArb,
+        idArb,
+        idArb,
+        idArb,
+        mappingArb,
+        kindArb,
+        (connId, modId, effectId, oscId, mapping, kindKey) => {
+          fc.pre(new Set([connId, modId, effectId, oscId]).size === 4);
+          const nodes: RuntimeNode[] = [
+            connector(connId, kindKey),
+            modulator(modId, mapping),
+            {
+              id: effectId,
+              type: 'effect',
+              data: {
+                kindKey: 'scale_snap',
+                tonic: 'C',
+                scaleKey: 'major',
+                enabled: true,
+                a4Hz: 440,
+              },
+            },
+            oscillator(oscId),
+          ];
+          const edges: RuntimeEdge[] = [
+            { id: `${connId}-${modId}`, source: connId, target: modId },
+            { id: `${modId}-${effectId}`, source: modId, target: effectId },
+            { id: `${effectId}-${oscId}`, source: effectId, target: oscId },
+          ];
+          const strips = listMonitorStrips(nodes, edges);
+          expect(strips.map((strip) => strip.id)).toEqual([modId]);
+          expect(strips.map((strip) => strip.channelKey)).toEqual([mapping.channelKey]);
+        },
+      ),
+    );
+  });
+
   it('lists one strip per complete chain when several oscillators are wired', () => {
     fc.assert(
       fc.property(

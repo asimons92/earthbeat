@@ -59,6 +59,7 @@ describe.skipIf(!hasDb)('patch persist handlers', () => {
             connectors: [],
             modulators: [],
             oscillators,
+            effects: [],
             wires: [],
           });
           const expectedVersion = Number(patch.version) + 1;
@@ -70,6 +71,7 @@ describe.skipIf(!hasDb)('patch persist handlers', () => {
             connectors: [],
             modulators: [],
             oscillators: [],
+            effects: [],
             wires: [],
           });
           await expect(staleAttempt).rejects.toBeInstanceOf(VersionConflictError);

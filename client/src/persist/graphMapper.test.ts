@@ -17,11 +17,12 @@ const graphArb: fc.Arbitrary<DomainGraph> = fc
     fc.uniqueArray(idArb, { minLength: 1, maxLength: 3 }),
     fc.uniqueArray(idArb, { minLength: 1, maxLength: 3 }),
     fc.uniqueArray(idArb, { minLength: 1, maxLength: 3 }),
+    fc.uniqueArray(idArb, { minLength: 0, maxLength: 2 }),
   )
-  .chain(([connectorIds, modulatorIds, oscillatorIds]) => {
+  .chain(([connectorIds, modulatorIds, oscillatorIds, effectIds]) => {
     fc.pre(
-      new Set([...connectorIds, ...modulatorIds, ...oscillatorIds]).size ===
-        connectorIds.length + modulatorIds.length + oscillatorIds.length,
+      new Set([...connectorIds, ...modulatorIds, ...oscillatorIds, ...effectIds]).size ===
+        connectorIds.length + modulatorIds.length + oscillatorIds.length + effectIds.length,
     );
     return patchIdArb.chain((patchId) => {
       const connectors = connectorIds.map((id, index) => ({
@@ -55,12 +56,27 @@ const graphArb: fc.Arbitrary<DomainGraph> = fc
         frequencyHz: 220,
         gain: 0.2,
       }));
+      const effects = effectIds.map((id, index) => ({
+        id,
+        patchId,
+        kindKey: 'scale_snap',
+        label: `E${index}`,
+        positionX: index * 10,
+        positionY: 120 + index * 5,
+        tonic: 'C',
+        scaleKey: 'major',
+        enabled: true,
+        a4Hz: 440,
+      }));
       const wirePairs: Array<{ source: string; target: string }> = [];
       const c0 = connectorIds[0];
       const m0 = modulatorIds[0];
+      const e0 = effectIds[0];
       const o0 = oscillatorIds[0];
       if (c0 && m0) wirePairs.push({ source: c0, target: m0 });
-      if (m0 && o0) wirePairs.push({ source: m0, target: o0 });
+      if (m0 && e0) wirePairs.push({ source: m0, target: e0 });
+      else if (m0 && o0) wirePairs.push({ source: m0, target: o0 });
+      if (e0 && o0) wirePairs.push({ source: e0, target: o0 });
       const wires = wirePairs.map((pair, index) => ({
         id: `wire-${index}`,
         patchId,
@@ -69,7 +85,7 @@ const graphArb: fc.Arbitrary<DomainGraph> = fc
         sourceHandle: 'out',
         targetHandle: 'in',
       }));
-      return fc.constant({ connectors, modulators, oscillators, wires });
+      return fc.constant({ connectors, modulators, oscillators, effects, wires });
     });
   });
 
@@ -88,6 +104,9 @@ describe('graphMapper', () => {
         );
         expect(back.oscillators.map((row) => row.id).sort()).toEqual(
           graph.oscillators.map((row) => row.id).sort(),
+        );
+        expect(back.effects.map((row) => row.id).sort()).toEqual(
+          graph.effects.map((row) => row.id).sort(),
         );
         expect(back.wires.map((row) => row.id).sort()).toEqual(
           graph.wires.map((row) => row.id).sort(),

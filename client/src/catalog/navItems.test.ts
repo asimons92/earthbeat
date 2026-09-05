@@ -14,6 +14,7 @@ const nonEmptyPathArb = fc
   .filter((p) => p.length > 0);
 const listSourceArb = fc.constantFrom(
   'connectorKinds',
+  'effectKinds',
   'patches',
   'none',
   'other',
@@ -28,7 +29,9 @@ const navItemArb: fc.Arbitrary<ShellNavItem> = fc
   })
   .map((item) => {
     if (
-      (item.listSource === 'connectorKinds' || item.listSource === 'patches') &&
+      (item.listSource === 'connectorKinds' ||
+        item.listSource === 'effectKinds' ||
+        item.listSource === 'patches') &&
       item.path.length === 0
     ) {
       return { ...item, path: `/${item.key}` };
@@ -37,12 +40,14 @@ const navItemArb: fc.Arbitrary<ShellNavItem> = fc
   });
 
 describe('libraryNavItemHasPath', () => {
-  it('requires a non-empty path for connectorKinds and patches list sources', () => {
+  it('requires a non-empty path for connectorKinds, effectKinds, and patches list sources', () => {
     fc.assert(
       fc.property(navItemArb, (item) => {
         const ok = libraryNavItemHasPath(item);
         const expected =
-          item.listSource === 'connectorKinds' || item.listSource === 'patches'
+          item.listSource === 'connectorKinds' ||
+          item.listSource === 'effectKinds' ||
+          item.listSource === 'patches'
             ? item.path.length > 0
             : true;
         expect(ok).toBe(expected);
@@ -55,7 +60,7 @@ describe('libraryNavItemHasPath', () => {
       fc.property(
         keyArb,
         labelArb,
-        fc.constantFrom('connectorKinds', 'patches'),
+        fc.constantFrom('connectorKinds', 'effectKinds', 'patches'),
         (key, label, listSource) => {
           const item: ShellNavItem = { key, label, path: '', listSource };
           const rejected = false;

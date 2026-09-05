@@ -3,7 +3,7 @@
 import { getConnectorKind } from '@/generated/catalog';
 
 import {
-  findModulationChain,
+  findCompleteModulationChains,
   type ModulationChain,
   type RuntimeEdge,
   type RuntimeNode,
@@ -52,7 +52,7 @@ export function stripFromChain(chain: ModulationChain): MonitorStrip {
   };
 }
 
-/** One strip per complete Connector → Modulator → Oscillator chain. */
+/** One strip per complete Connector → Modulator → (Effect*) → Oscillator chain. */
 export function listMonitorStrips(
   nodes: RuntimeNode[],
   edges: RuntimeEdge[],
@@ -61,12 +61,12 @@ export function listMonitorStrips(
   const seen = new Set<string>();
   for (const node of nodes) {
     if (node.type !== 'oscillator') continue;
-    const chain = findModulationChain(nodes, edges, node.id);
-    if (!chain.complete) continue;
-    const strip = stripFromChain(chain);
-    if (seen.has(strip.id)) continue;
-    seen.add(strip.id);
-    strips.push(strip);
+    for (const chain of findCompleteModulationChains(nodes, edges, node.id)) {
+      const strip = stripFromChain(chain);
+      if (seen.has(strip.id)) continue;
+      seen.add(strip.id);
+      strips.push(strip);
+    }
   }
   return strips;
 }

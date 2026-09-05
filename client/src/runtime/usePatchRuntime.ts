@@ -12,8 +12,6 @@ import {
   resolveVoiceParams,
   type ConnectorSample,
 } from './resolveVoiceParams';
-import type { RuntimeEdge, RuntimeNode } from './modulationChain';
-import { findModulationChain } from './modulationChain';
 import { listMonitorStrips, type MonitorStrip } from './monitorStrips';
 import {
   appendSampleToHistory,
@@ -30,29 +28,9 @@ import {
   transportEventForPatchLoad,
 } from './voiceStop';
 import { connectorKindKeysFromNodes, streamUrlsForKindKeys } from './streamUrls';
+import { toRuntimeEdges, toRuntimeNodes } from './runtimeNodes';
 
 export type LiveStatus = 'off' | 'connecting' | 'live' | 'error';
-
-function toRuntimeNodes(nodes: Node[]): RuntimeNode[] {
-  return nodes
-    .filter(
-      (node) =>
-        node.type === 'connector' || node.type === 'modulator' || node.type === 'oscillator',
-    )
-    .map((node) => ({
-      id: node.id,
-      type: node.type as RuntimeNode['type'],
-      data: node.data as Record<string, unknown>,
-    }));
-}
-
-function toRuntimeEdges(edges: Edge[]): RuntimeEdge[] {
-  return edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-  }));
-}
 
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15000;
@@ -126,13 +104,12 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
       transportRef.current.playingOscillatorIds,
     )) {
       if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) continue;
-      const chain = findModulationChain(runtimeNodes, runtimeEdges, oscillatorId);
-      const kindKey =
-        chain.complete && typeof chain.connector.data.kindKey === 'string'
-          ? chain.connector.data.kindKey
-          : null;
-      const sample = kindKey ? (samplesByKindRef.current[kindKey] ?? null) : null;
-      const params = resolveVoiceParams(runtimeNodes, runtimeEdges, oscillatorId, sample);
+      const params = resolveVoiceParams(
+        runtimeNodes,
+        runtimeEdges,
+        oscillatorId,
+        samplesByKindRef.current,
+      );
       const osc = runtimeNodes.find((node) => node.id === oscillatorId);
       const restingFreq =
         typeof osc?.data.frequencyHz === 'number' ? osc.data.frequencyHz : params.frequencyHz;
@@ -293,18 +270,23 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
       const engine = engineRef.current;
       if (!engine) return;
 
-      for (const id of planStoppedVoiceRemoval(
+      const stoppedIds = planStoppedVoiceRemoval(
         prev.playingOscillatorIds,
         next.playingOscillatorIds,
-      )) {
+      );
+      for (const id of stoppedIds) {
         await engine.removeVoice(id);
       }
 
-      for (const id of planIdleEnginePurge(
-        next.playingOscillatorIds,
-        new Set(engine.listVoiceIds()),
-      )) {
-        await engine.removeVoice(id);
+      if (next.playingOscillatorIds.size === 0) {
+        await engine.clearAllVoices();
+      } else {
+        for (const id of planIdleEnginePurge(
+          next.playingOscillatorIds,
+          new Set(engine.listVoiceIds()),
+        )) {
+          await engine.removeVoice(id);
+        }
       }
 
       if (hold) {

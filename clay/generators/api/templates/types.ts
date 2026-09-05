@@ -29,6 +29,7 @@ export type PatchGraphPayload = {
   connectors: Connector[];
   modulators: Modulator[];
   oscillators: Oscillator[];
+  effects: Effect[];
   wires: Wire[];
 };
 

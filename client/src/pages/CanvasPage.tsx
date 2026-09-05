@@ -10,12 +10,14 @@ import { NodeInspector } from '@/components/NodeInspector';
 import { useTheme } from '@/theme/useTheme';
 import { usePatchWorkspace } from '@/workspace/PatchWorkspace';
 import { ConnectorNode } from '@/nodes/ConnectorNode';
+import { EffectNode } from '@/nodes/EffectNode';
 import { ModulatorNode } from '@/nodes/ModulatorNode';
 import { OscillatorNode } from '@/nodes/OscillatorNode';
 
 const nodeTypes = {
   connector: ConnectorNode,
   modulator: ModulatorNode,
+  effect: EffectNode,
   oscillator: OscillatorNode,
 } satisfies NodeTypes;
 
@@ -31,6 +33,7 @@ export function CanvasPage() {
     onConnect,
     onSelectionChange,
     onChangeNodeData,
+    removeNode,
   } = usePatchWorkspace();
 
   return (
@@ -65,6 +68,7 @@ export function CanvasPage() {
         edges={edges}
         selectedNodeId={selectedNodeId}
         onChangeNodeData={onChangeNodeData}
+        onRemoveNode={removeNode}
       />
     </>
   );

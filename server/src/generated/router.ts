@@ -76,6 +76,14 @@ const oscillatorSchema = graphNodeBase.extend({
   gain: z.number(),
 });
 
+const effectSchema = graphNodeBase.extend({
+  kindKey: z.string(),
+  tonic: z.string(),
+  scaleKey: z.string(),
+  enabled: z.boolean(),
+  a4Hz: z.number(),
+});
+
 const wireSchema = z.object({
   id: z.string(),
   patchId: z.string(),
@@ -152,6 +160,7 @@ export const appRouter = t.router({
           connectors: z.array(connectorSchema),
           modulators: z.array(modulatorSchema),
           oscillators: z.array(oscillatorSchema),
+          effects: z.array(effectSchema),
           wires: z.array(wireSchema),
         }),
       )

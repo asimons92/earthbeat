@@ -11,6 +11,8 @@ export type PatchAudioEngine = {
   ensureVoice: (oscillatorId: string, initialFreqHz: number, initialGain: number) => Promise<VoiceControls>;
   setVoiceAudible: (oscillatorId: string, audible: boolean) => Promise<void>;
   removeVoice: (oscillatorId: string) => Promise<void>;
+  /** Drop every voice and commit silence (Stop / idle). */
+  clearAllVoices: () => Promise<void>;
   listVoiceIds: () => string[];
   /** Copy current time-domain analyser data into `out` (−1..1). Returns false if unavailable. */
   getTimeDomainSnapshot: (out: Float32Array) => boolean;
@@ -44,25 +46,24 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
   await ctx.resume();
 
   const voices = new Map<string, VoiceState>();
-  let renderGeneration = 0;
+  /** Serialize graph rebuilds so a stale core.render cannot restore a removed voice. */
+  let rebuildQueue: Promise<void> = Promise.resolve();
 
-  async function rebuildGraph() {
-    const generation = ++renderGeneration;
-    const tones = [...voices.values()].map((voice) => voice.tone);
-    if (tones.length === 0) {
-      const silence = el.const({ value: 0 });
-      if (generation === renderGeneration) {
+  function enqueueRebuild(): Promise<void> {
+    rebuildQueue = rebuildQueue.then(async () => {
+      const tones = [...voices.values()].map((voice) => voice.tone);
+      if (tones.length === 0) {
+        const silence = el.const({ value: 0 });
         await core.render(silence, silence);
+        return;
       }
-      return;
-    }
-    let mix: ElemNode = tones[0]!;
-    for (let i = 1; i < tones.length; i++) {
-      mix = el.add(mix, tones[i]!);
-    }
-    if (generation === renderGeneration) {
+      let mix: ElemNode = tones[0]!;
+      for (let i = 1; i < tones.length; i++) {
+        mix = el.add(mix, tones[i]!);
+      }
       await core.render(mix, mix);
-    }
+    });
+    return rebuildQueue;
   }
 
   async function ensureVoice(
@@ -110,7 +111,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
       tone,
     });
 
-    await rebuildGraph();
+    await enqueueRebuild();
     return controls;
   }
 
@@ -124,7 +125,16 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
   async function removeVoice(oscillatorId: string) {
     if (!voices.has(oscillatorId)) return;
     voices.delete(oscillatorId);
-    await rebuildGraph();
+    await enqueueRebuild();
+  }
+
+  async function clearAllVoices() {
+    if (voices.size === 0) {
+      await enqueueRebuild();
+      return;
+    }
+    voices.clear();
+    await enqueueRebuild();
   }
 
   function listVoiceIds() {
@@ -139,6 +149,11 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
 
   async function dispose() {
     voices.clear();
+    try {
+      await enqueueRebuild();
+    } catch {
+      // Renderer may already be torn down.
+    }
     analyser.disconnect();
     node.disconnect();
     await ctx.close();
@@ -149,6 +164,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     ensureVoice,
     setVoiceAudible,
     removeVoice,
+    clearAllVoices,
     listVoiceIds,
     getTimeDomainSnapshot,
     dispose,

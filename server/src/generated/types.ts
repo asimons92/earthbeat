@@ -100,6 +100,44 @@ export type Oscillator = {
 };
 
 
+export type EffectKind = {
+
+  key: string;
+
+  label: string;
+
+  description?: string;
+
+  transforms: unknown[];
+
+};
+
+
+export type Effect = {
+
+  id: string;
+
+  patchId: string;
+
+  kindKey: string;
+
+  label?: string;
+
+  positionX: number;
+
+  positionY: number;
+
+  tonic: string;
+
+  scaleKey: string;
+
+  enabled: boolean;
+
+  a4Hz: number;
+
+};
+
+
 export type Modulator = {
 
   id: string;
@@ -149,6 +187,7 @@ export type PatchGraphPayload = {
   connectors: Connector[];
   modulators: Modulator[];
   oscillators: Oscillator[];
+  effects: Effect[];
   wires: Wire[];
 };
 

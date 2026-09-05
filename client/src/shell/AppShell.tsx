@@ -1,16 +1,24 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import {
   shellAuthActions,
   shellCreateActions,
   shellNavItems,
+  shellPatchFileActions,
 } from '@/generated/catalog';
 import { decideAuthChrome } from '@/persist/sessionBootstrap';
+import {
+  decideDirtyNavigation,
+  decideSaveRoute,
+  shouldShowPatchFileActions,
+} from '@/persist/patchFileActions';
 import { startGoogleSignIn, startSignOut } from '@/persist/authActions';
 import { ThemeToggle } from '@/theme/ThemeToggle';
 import { usePatchWorkspace } from '@/workspace/PatchWorkspace';
 import { OutputMonitor } from '@/shell/OutputMonitor';
+import { DiscardChangesDialog, PatchNameDialog } from '@/shell/PatchFileDialogs';
 
 function persistLabel(status: string) {
   if (status === 'saving') return 'Saving…';
@@ -20,18 +28,21 @@ function persistLabel(status: string) {
   return 'Not saved';
 }
 
+type NameDialogMode = 'save' | 'saveAs' | null;
+
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isCanvas = shouldShowPatchFileActions(location.pathname);
   const {
     sessionReady,
     authMode,
-    patches,
     activePatchId,
     activePatchName,
     persistStatus,
+    isDirty,
     saveNow,
     createPatch,
-    loadPatch,
     resolveConflictByReload,
     addModulator,
     addOscillator,
@@ -45,28 +56,60 @@ export function AppShell() {
     getTimeDomainSnapshot,
     playAllOscillators,
     stopAllOscillators,
+    newBlankPatch,
   } = usePatchWorkspace();
+
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [nameDialogMode, setNameDialogMode] = useState<NameDialogMode>(null);
 
   const authChrome = decideAuthChrome({ authMode, sessionReady });
   const googleSignInAction = shellAuthActions.find((action) => action.key === 'google_sign_in');
   const signOutAction = shellAuthActions.find((action) => action.key === 'sign_out');
 
-  const onSaveClick = async () => {
+  const fileActions = useMemo(
+    () => ({
+      new: shellPatchFileActions.find((action) => action.key === 'new'),
+      save: shellPatchFileActions.find((action) => action.key === 'save'),
+      saveAs: shellPatchFileActions.find((action) => action.key === 'saveAs'),
+    }),
+    [],
+  );
+
+  const runNew = () => {
+    newBlankPatch();
+  };
+
+  const onNewClick = () => {
+    if (decideDirtyNavigation(isDirty, 'new') === 'prompt') {
+      setDiscardOpen(true);
+      return;
+    }
+    runNew();
+  };
+
+  const onSaveClick = () => {
     if (!sessionReady) {
       window.alert('Sign in to save a Patch.');
       return;
     }
-    if (!activePatchId) {
-      const name = window.prompt('Patch name', activePatchName) ?? activePatchName;
-      await createPatch(name.trim() || 'Untitled Patch');
+    if (decideSaveRoute('save', activePatchId) === 'nameThenCreate') {
+      setNameDialogMode('save');
       return;
     }
-    await saveNow();
+    void saveNow();
   };
 
-  const onSelectPatch = async (patchId: string) => {
-    if (!patchId) return;
-    await loadPatch(patchId);
+  const onSaveAsClick = () => {
+    if (!sessionReady) {
+      window.alert('Sign in to save a Patch.');
+      return;
+    }
+    setNameDialogMode('saveAs');
+  };
+
+  const onNameConfirm = async (name: string) => {
+    setNameDialogMode(null);
+    await createPatch(name);
   };
 
   return (
@@ -82,9 +125,13 @@ export function AppShell() {
                 ? () => {
                     navigate('/connectors');
                   }
-                : action.nodeType === 'modulator'
-                  ? addModulator
-                  : addOscillator;
+                : action.nodeType === 'effect'
+                  ? () => {
+                      navigate('/effects');
+                    }
+                  : action.nodeType === 'modulator'
+                    ? addModulator
+                    : addOscillator;
             return (
               <Button
                 key={action.key}
@@ -98,24 +145,61 @@ export function AppShell() {
             );
           })}
         </div>
-        <label className="shell__patch-select">
-          <span className="visually-hidden">Active patch</span>
-          <select
-            value={activePatchId ?? ''}
-            aria-label="Active patch"
-            onChange={(event) => {
-              void onSelectPatch(event.target.value);
-            }}
-          >
-            <option value="">{activePatchName}</option>
-            {patches.map((patch) => (
-              <option key={patch.id} value={patch.id}>
-                {patch.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="shell__center">
+          <span className="shell__patch-name" aria-live="polite">
+            {activePatchName}
+          </span>
+          <div className="shell__transport-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={playAllOscillators}
+              aria-label="Play all oscillators"
+            >
+              ▶
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={stopAllOscillators}
+              aria-label="Stop all oscillators"
+            >
+              ■
+            </Button>
+          </div>
+        </div>
         <div className="shell__transport">
+          {isCanvas ? (
+            <>
+              {fileActions.new ? (
+                <Button type="button" variant="outline" size="sm" onClick={onNewClick}>
+                  {fileActions.new.label}
+                </Button>
+              ) : null}
+              {fileActions.save ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void onSaveClick()}
+                >
+                  {fileActions.save.label}
+                </Button>
+              ) : null}
+              {fileActions.saveAs ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void onSaveAsClick()}
+                >
+                  {fileActions.saveAs.label}
+                </Button>
+              ) : null}
+            </>
+          ) : null}
           {authChrome === 'signIn' && googleSignInAction ? (
             <Button
               type="button"
@@ -144,9 +228,6 @@ export function AppShell() {
               {signOutAction.label}
             </Button>
           ) : null}
-          <Button type="button" variant="outline" size="sm" onClick={() => void onSaveClick()}>
-            Save
-          </Button>
           <span className="shell__persist-status" data-status={persistStatus}>
             {persistLabel(persistStatus)}
           </span>
@@ -160,24 +241,6 @@ export function AppShell() {
               Reload
             </Button>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={playAllOscillators}
-            aria-label="Play all oscillators"
-          >
-            ▶
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={stopAllOscillators}
-            aria-label="Stop all oscillators"
-          >
-            ■
-          </Button>
           <span
             className={
               liveStatus === 'live'
@@ -233,38 +296,31 @@ export function AppShell() {
         getTimeDomainSnapshot={getTimeDomainSnapshot}
       />
 
-      <footer className="shell__footer" aria-label="Patches">
-        {patches.map((patch) => (
-          <button
-            key={patch.id}
-            type="button"
-            className={
-              patch.id === activePatchId ? 'patch-tab patch-tab--active' : 'patch-tab'
-            }
-            onClick={() => {
-              void loadPatch(patch.id);
-            }}
-          >
-            {patch.name}
-          </button>
-        ))}
-        <button
-          type="button"
-          className="patch-tab patch-tab--new"
-          aria-label="New patch"
-          onClick={() => {
-            if (!sessionReady) {
-              window.alert('Sign in to save a Patch.');
-              return;
-            }
-            void createPatch(`Patch ${patches.length + 1}`);
-          }}
-        >
-          +
-        </button>
-      </footer>
-
       <ThemeToggle />
+
+      <DiscardChangesDialog
+        open={discardOpen}
+        onStay={() => setDiscardOpen(false)}
+        onDiscard={() => {
+          setDiscardOpen(false);
+          runNew();
+        }}
+      />
+
+      <PatchNameDialog
+        open={nameDialogMode !== null}
+        title={nameDialogMode === 'saveAs' ? 'Save As' : 'Save Patch'}
+        description={
+          nameDialogMode === 'saveAs'
+            ? 'Create a new Patch from the current graph.'
+            : 'Name this Patch before the first save.'
+        }
+        initialName={activePatchName}
+        onCancel={() => setNameDialogMode(null)}
+        onConfirm={(name) => {
+          void onNameConfirm(name);
+        }}
+      />
     </div>
   );
 }

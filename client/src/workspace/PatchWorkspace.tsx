@@ -18,8 +18,10 @@ import {
 } from '@xyflow/react';
 
 import { buildConnectorNode } from '@/catalog/buildConnectorNode';
+import { buildEffectNode } from '@/catalog/buildEffectNode';
 import {
   connectorKindsByKey,
+  effectKindsByKey,
   modulatorDefaults,
   oscillatorDefaults,
   usgsConnector,
@@ -44,6 +46,7 @@ const noaaInMax =
 import { usePatchPersist } from '@/persist/usePatchPersist';
 import { usePatchRuntime } from '@/runtime/usePatchRuntime';
 import { type ConnectorFlowNode } from '@/nodes/ConnectorNode';
+import { type EffectFlowNode } from '@/nodes/EffectNode';
 import { type ModulatorFlowNode } from '@/nodes/ModulatorNode';
 import { type OscillatorFlowNode } from '@/nodes/OscillatorNode';
 
@@ -171,17 +174,22 @@ type PatchWorkspaceValue = {
   onSelectionChange: OnSelectionChangeFunc;
   onChangeNodeData: (nodeId: string, data: Record<string, unknown>) => void;
   addConnector: (kindKey: string) => boolean;
+  addEffect: (kindKey: string) => boolean;
   addModulator: () => void;
   addOscillator: () => void;
+  removeNode: (nodeId: string) => void;
   sessionReady: boolean;
   authMode: string;
   patches: ReturnType<typeof usePatchPersist>['patches'];
   activePatchId: string | null;
   activePatchName: string;
   persistStatus: ReturnType<typeof usePatchPersist>['persistStatus'];
+  isDirty: boolean;
   saveNow: () => Promise<void>;
   createPatch: ReturnType<typeof usePatchPersist>['createPatch'];
   loadPatch: (id: string) => Promise<void>;
+  newBlankPatch: () => void;
+  deletePatch: (id: string, expectedVersion: number) => Promise<{ wasActive: boolean }>;
   resolveConflictByReload: () => Promise<void>;
   liveStatus: ReturnType<typeof usePatchRuntime>['liveStatus'];
   lastSample: ReturnType<typeof usePatchRuntime>['lastSample'];
@@ -206,6 +214,8 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
   const {
     scheduleAutosave,
     loadPatch: persistLoadPatch,
+    newBlankPatch: persistNewBlankPatch,
+    deletePatch: persistDeletePatch,
     resolveConflictByReload: persistResolveConflictByReload,
   } = persist;
 
@@ -232,6 +242,21 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       await persistLoadPatch(id);
     },
     [persistLoadPatch, resetTransportForPatchLoad],
+  );
+
+  const newBlankPatch = useCallback(() => {
+    resetTransportForPatchLoad();
+    persistNewBlankPatch();
+  }, [persistNewBlankPatch, resetTransportForPatchLoad]);
+
+  const deletePatch = useCallback(
+    async (id: string, expectedVersion: number) => {
+      if (persist.activePatchId === id) {
+        resetTransportForPatchLoad();
+      }
+      return persistDeletePatch(id, expectedVersion);
+    },
+    [persist.activePatchId, persistDeletePatch, resetTransportForPatchLoad],
   );
 
   const resolveConflictByReload = useCallback(async () => {
@@ -368,6 +393,39 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
     [setNodes],
   );
 
+  const addEffect = useCallback(
+    (kindKey: string) => {
+      if (!(kindKey in effectKindsByKey)) return false;
+      setNodes((current) => {
+        const index = current.filter((node) => node.type === 'effect').length;
+        const draft = buildEffectNode({
+          kindKey,
+          kindsByKey: effectKindsByKey,
+          existingEffectCount: index,
+          position: nextOffset(current.length),
+          newId: `effect-${crypto.randomUUID()}`,
+        });
+        if (!draft) return current;
+        const node: EffectFlowNode = draft;
+        return [...current, node];
+      });
+      return true;
+    },
+    [setNodes],
+  );
+
+  const removeNode = useCallback(
+    (nodeId: string) => {
+      const removeIds = new Set([nodeId]);
+      setNodes((current) => current.filter((node) => !removeIds.has(node.id)));
+      setEdges((current) =>
+        current.filter((edge) => !removeIds.has(edge.source) && !removeIds.has(edge.target)),
+      );
+      setSelectedNodeId((current) => (current === nodeId ? null : current));
+    },
+    [setEdges, setNodes],
+  );
+
   const value = useMemo<PatchWorkspaceValue>(
     () => ({
       nodes,
@@ -380,17 +438,22 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       onSelectionChange,
       onChangeNodeData,
       addConnector,
+      addEffect,
       addModulator,
       addOscillator,
+      removeNode,
       sessionReady: persist.sessionReady,
       authMode: persist.authMode,
       patches: persist.patches,
       activePatchId: persist.activePatchId,
       activePatchName: persist.activePatchName,
       persistStatus: persist.persistStatus,
+      isDirty: persist.isDirty,
       saveNow: persist.saveNow,
       createPatch: persist.createPatch,
       loadPatch,
+      newBlankPatch,
+      deletePatch,
       resolveConflictByReload,
       liveStatus,
       lastSample,
@@ -414,17 +477,22 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       onSelectionChange,
       onChangeNodeData,
       addConnector,
+      addEffect,
       addModulator,
       addOscillator,
+      removeNode,
       persist.sessionReady,
       persist.authMode,
       persist.patches,
       persist.activePatchId,
       persist.activePatchName,
       persist.persistStatus,
+      persist.isDirty,
       persist.saveNow,
       persist.createPatch,
       loadPatch,
+      newBlankPatch,
+      deletePatch,
       resolveConflictByReload,
       liveStatus,
       lastSample,

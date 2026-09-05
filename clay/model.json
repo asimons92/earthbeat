@@ -19,6 +19,11 @@
             "nodeType": "modulator"
           },
           {
+            "key": "addEffect",
+            "label": "New effect",
+            "nodeType": "effect"
+          },
+          {
             "key": "addOscillator",
             "label": "New oscillator",
             "nodeType": "oscillator"
@@ -59,6 +64,24 @@
             "path": "/api/auth/signout"
           }
         ],
+        "patchFileActions": [
+          {
+            "key": "new",
+            "label": "New"
+          },
+          {
+            "key": "save",
+            "label": "Save"
+          },
+          {
+            "key": "saveAs",
+            "label": "Save As"
+          },
+          {
+            "key": "delete",
+            "label": "Delete"
+          }
+        ],
         "navItems": [
           {
             "key": "canvas",
@@ -71,6 +94,12 @@
             "label": "Connector Library",
             "path": "/connectors",
             "listSource": "connectorKinds"
+          },
+          {
+            "key": "effectLibrary",
+            "label": "Effect Library",
+            "path": "/effects",
+            "listSource": "effectKinds"
           },
           {
             "key": "patchLibrary",
@@ -207,6 +236,61 @@
         "inMax": 8,
         "outMin": 0.5,
         "outMax": 4
+      },
+      "effectKinds": [
+        {
+          "key": "scale_snap",
+          "label": "Scale Snap",
+          "description": "Snaps Oscillator Hertz to the nearest pitch in a tonic and named scale.",
+          "transforms": ["frequencyHz"],
+          "defaultTonic": "C",
+          "defaultScaleKey": "major",
+          "defaultEnabled": true,
+          "a4Hz": 440
+        }
+      ],
+      "scaleSnapTonics": [
+        { "key": "C", "label": "C" },
+        { "key": "C#", "label": "C#" },
+        { "key": "D", "label": "D" },
+        { "key": "D#", "label": "D#" },
+        { "key": "E", "label": "E" },
+        { "key": "F", "label": "F" },
+        { "key": "F#", "label": "F#" },
+        { "key": "G", "label": "G" },
+        { "key": "G#", "label": "G#" },
+        { "key": "A", "label": "A" },
+        { "key": "A#", "label": "A#" },
+        { "key": "B", "label": "B" }
+      ],
+      "scaleSnapScales": [
+        {
+          "key": "major",
+          "label": "Major",
+          "degrees": [0, 2, 4, 5, 7, 9, 11]
+        },
+        {
+          "key": "natural_minor",
+          "label": "Natural minor",
+          "degrees": [0, 2, 3, 5, 7, 8, 10]
+        },
+        {
+          "key": "major_pentatonic",
+          "label": "Major pentatonic",
+          "degrees": [0, 2, 4, 7, 9]
+        },
+        {
+          "key": "minor_pentatonic",
+          "label": "Minor pentatonic",
+          "degrees": [0, 3, 5, 7, 10]
+        }
+      ],
+      "effectDefaults": {
+        "kindKey": "scale_snap",
+        "tonic": "C",
+        "scaleKey": "major",
+        "enabled": true,
+        "a4Hz": 440
       }
     },
     "types": [
@@ -410,6 +494,12 @@
                 "type": "json",
                 "required": true,
                 "description": "Full Oscillator rows for this Patch."
+              },
+              {
+                "name": "effects",
+                "type": "json",
+                "required": true,
+                "description": "Full Effect rows for this Patch."
               },
               {
                 "name": "wires",
@@ -794,6 +884,204 @@
               },
               {
                 "name": "gain",
+                "type": "number"
+              },
+              {
+                "name": "label",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "remove",
+            "parameters": [
+              {
+                "name": "id",
+                "type": "string",
+                "required": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "EffectKind",
+        "persist": false,
+        "description": "Catalog entry for an Effect kind. scale_snap snaps frequencyHz to a tonic and named scale.",
+        "fields": [
+          {
+            "name": "key",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "label",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "transforms",
+            "type": "array",
+            "required": true
+          }
+        ]
+      },
+      {
+        "name": "Effect",
+        "description": "Canvas node: post-map transform on the path into an Oscillator. MVP kind is scale_snap (tonic + scale → nearest Hertz).",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "patchId",
+            "type": "string",
+            "required": true,
+            "ref": "Patch"
+          },
+          {
+            "name": "kindKey",
+            "type": "string",
+            "required": true,
+            "ref": "EffectKind"
+          },
+          {
+            "name": "label",
+            "type": "string"
+          },
+          {
+            "name": "positionX",
+            "type": "number",
+            "required": true
+          },
+          {
+            "name": "positionY",
+            "type": "number",
+            "required": true
+          },
+          {
+            "name": "tonic",
+            "type": "string",
+            "required": true,
+            "default": "C",
+            "description": "Scale tonic pitch class (C through B, sharps)."
+          },
+          {
+            "name": "scaleKey",
+            "type": "string",
+            "required": true,
+            "default": "major",
+            "description": "Named scale key from catalog.scaleSnapScales."
+          },
+          {
+            "name": "enabled",
+            "type": "boolean",
+            "required": true,
+            "default": true,
+            "description": "Pedal-style bypass. When false, Hertz passes through unchanged."
+          },
+          {
+            "name": "a4Hz",
+            "type": "number",
+            "required": true,
+            "default": 440,
+            "description": "Equal-temperament A4 reference in Hertz."
+          }
+        ],
+        "commands": [
+          {
+            "name": "add",
+            "parameters": [
+              {
+                "name": "patchId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "kindKey",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "positionX",
+                "type": "number",
+                "required": true
+              },
+              {
+                "name": "positionY",
+                "type": "number",
+                "required": true
+              },
+              {
+                "name": "label",
+                "type": "string"
+              },
+              {
+                "name": "tonic",
+                "type": "string"
+              },
+              {
+                "name": "scaleKey",
+                "type": "string"
+              },
+              {
+                "name": "enabled",
+                "type": "boolean"
+              },
+              {
+                "name": "a4Hz",
+                "type": "number"
+              }
+            ]
+          },
+          {
+            "name": "move",
+            "parameters": [
+              {
+                "name": "id",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "positionX",
+                "type": "number",
+                "required": true
+              },
+              {
+                "name": "positionY",
+                "type": "number",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "updateParams",
+            "parameters": [
+              {
+                "name": "id",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "tonic",
+                "type": "string"
+              },
+              {
+                "name": "scaleKey",
+                "type": "string"
+              },
+              {
+                "name": "enabled",
+                "type": "boolean"
+              },
+              {
+                "name": "a4Hz",
                 "type": "number"
               },
               {

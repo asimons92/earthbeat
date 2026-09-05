@@ -6,7 +6,7 @@ export type ShellNavItem = {
   listSource: string;
 };
 
-const LIBRARY_SOURCES = new Set(['connectorKinds', 'patches']);
+const LIBRARY_SOURCES = new Set(['connectorKinds', 'effectKinds', 'patches']);
 
 /** Library nav items must declare a non-empty path string. */
 export function libraryNavItemHasPath(item: ShellNavItem): boolean {
