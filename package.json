@@ -1,0 +1,9 @@
+{
+  "name": "earthbeat_2",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --dir client dev",
+    "build": "pnpm --dir client build",
+    "lint": "pnpm --dir client lint"
+  }
+}

@@ -2,6 +2,29 @@
   "name": "earthbeat",
   "generators": ["./generators/api"],
   "model": {
+    "catalog": {
+      "connectors": [
+        {
+          "key": "usgs_earthquakes",
+          "label": "USGS Quakes",
+          "description": "USGS all-day earthquake feed",
+          "channels": [
+            {
+              "key": "mag",
+              "label": "Magnitude",
+              "unit": "Mw",
+              "min": 1,
+              "max": 8
+            }
+          ]
+        }
+      ],
+      "oscillatorDefaults": {
+        "waveform": "sine",
+        "baseFrequencyHz": 220,
+        "gain": 0.2
+      }
+    },
     "types": [
       {
         "name": "User",
@@ -29,7 +52,7 @@
         ]
       },
       {
-        "name": "Pipeline",
+        "name": "Patch",
         "fields": [
           { "name": "id", "type": "string", "required": true },
           { "name": "userId", "type": "string", "required": true, "ref": "User" },
@@ -96,10 +119,10 @@
       },
       {
         "name": "Connection",
-        "description": "Canvas node: an instance of a Connector inside a Pipeline.",
+        "description": "Canvas node: an instance of a Connector inside a Patch.",
         "fields": [
           { "name": "id", "type": "string", "required": true },
-          { "name": "pipelineId", "type": "string", "required": true, "ref": "Pipeline" },
+          { "name": "patchId", "type": "string", "required": true, "ref": "Patch" },
           { "name": "connectorKey", "type": "string", "required": true, "ref": "Connector" },
           { "name": "label", "type": "string" },
           { "name": "positionX", "type": "number", "required": true },
@@ -110,7 +133,7 @@
           {
             "name": "add",
             "parameters": [
-              { "name": "pipelineId", "type": "string", "required": true },
+              { "name": "patchId", "type": "string", "required": true },
               { "name": "connectorKey", "type": "string", "required": true },
               { "name": "positionX", "type": "number", "required": true },
               { "name": "positionY", "type": "number", "required": true },
@@ -146,7 +169,7 @@
         "description": "Canvas node: sound generator driven by incoming modulations.",
         "fields": [
           { "name": "id", "type": "string", "required": true },
-          { "name": "pipelineId", "type": "string", "required": true, "ref": "Pipeline" },
+          { "name": "patchId", "type": "string", "required": true, "ref": "Patch" },
           { "name": "label", "type": "string" },
           { "name": "positionX", "type": "number", "required": true },
           { "name": "positionY", "type": "number", "required": true },
@@ -158,7 +181,7 @@
           {
             "name": "add",
             "parameters": [
-              { "name": "pipelineId", "type": "string", "required": true },
+              { "name": "patchId", "type": "string", "required": true },
               { "name": "positionX", "type": "number", "required": true },
               { "name": "positionY", "type": "number", "required": true },
               { "name": "waveform", "type": "string" },
@@ -198,7 +221,7 @@
         "description": "Graph edge from a Connection to an Oscillator, with mapping parameters (what the signal does to the sound).",
         "fields": [
           { "name": "id", "type": "string", "required": true },
-          { "name": "pipelineId", "type": "string", "required": true, "ref": "Pipeline" },
+          { "name": "patchId", "type": "string", "required": true, "ref": "Patch" },
           { "name": "fromConnectionId", "type": "string", "required": true, "ref": "Connection" },
           { "name": "toOscillatorId", "type": "string", "required": true, "ref": "Oscillator" },
           { "name": "channelKey", "type": "string", "required": true },
@@ -212,7 +235,7 @@
           {
             "name": "connect",
             "parameters": [
-              { "name": "pipelineId", "type": "string", "required": true },
+              { "name": "patchId", "type": "string", "required": true },
               { "name": "fromConnectionId", "type": "string", "required": true },
               { "name": "toOscillatorId", "type": "string", "required": true },
               { "name": "channelKey", "type": "string", "required": true },

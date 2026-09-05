@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-**Earthbeat** turns natural-world signal sources into sound through user-built audio pipelines.
+**Earthbeat** turns natural-world signal sources into sound through user-built audio patches.
 
 Many natural phenomena expose public or accessible APIs (earthquakes, weather, space weather, tides, air quality, and more). Earthbeat treats those feeds as **modular inputs** that can be wired—on a visual canvas—into processors and sound generators, in the spirit of a modular synthesizer.
 
@@ -13,16 +13,16 @@ The abandoned v1 repo proved one slice of this: USGS earthquake data modulating 
 Natural data is abundant and often free to access, but experiencing it is usually limited to charts, maps, or dashboards. Musicians, sound designers, educators, and curious listeners lack a simple way to:
 
 - Connect real-world signals to sound without writing custom glue for every API
-- Compose those signals into reusable, shareable **patches** (pipelines)
+- Compose those signals into reusable, shareable **patches**
 - Save and return to work across sessions
 
 ## 3. Vision
 
 Earthbeat is a **browser-based modular sonification environment**:
 
-1. **Sources** pull or stream natural signals from external APIs
-2. Users arrange **nodes** on a **React Flow** canvas and connect them into pipelines
-3. Pipelines drive **sound generators** (and related transforms) in real time
+1. **Connections** pull or stream natural signals from external APIs
+2. Users arrange **nodes** on a **React Flow** canvas and connect them into patches
+3. Patches drive **sound generators** (and related transforms) in real time
 4. Signed-in users can **save, reload, and iterate** on patches
 
 The canvas is the primary creative surface—closer to a modular synth or node editor than to a form-driven CRUD app.
@@ -31,9 +31,9 @@ The canvas is the primary creative surface—closer to a modular synth or node e
 
 ### Primary
 
-- Let a user build a working pipeline: at least one natural **source** → optional **transforms** → at least one **sound** output
-- Support **multiple source types** over time (not a single hard-coded API)
-- Persist user work (patches/pipelines) behind authentication
+- Let a user build a working patch: at least one natural **Connection** → optional **Modulation** → at least one **sound** output
+- Support **multiple Connector kinds** over time (not a single hard-coded API)
+- Persist user work (patches) behind authentication
 - Keep the domain model explicit and regenerable (Clay / model-driven development)
 
 ### Secondary (near-term ambition, not day-one)
@@ -56,15 +56,15 @@ The canvas is the primary creative surface—closer to a modular synth or node e
 | Explorer | Hear the planet / nature as sound with minimal setup |
 | Sound designer / musician | Map real signals into patches they can tweak and save |
 | Educator / demonstrator | Show live data → sound cause-and-effect on a clear graph |
-| Builder (future) | Add or configure new sources without forking the whole app |
+| Builder (future) | Add or configure new Connectors without forking the whole app |
 
 **Assumption:** first useful product slice targets a single signed-in user building and saving their own patches (not multiplayer editing).
 
 ## 6. Core concepts
 
-### 6.1 Source
+### 6.1 Connector and Connection
 
-A connector to an external natural-signal API (or a normalized feed derived from one).
+A Connector is a catalog entry for an external natural-signal API (or a normalized feed derived from one).
 
 Examples (illustrative, not a committed catalog):
 
@@ -74,56 +74,56 @@ Examples (illustrative, not a committed catalog):
 - Tides / water level
 - Air quality
 
-A source exposes a **stream or poll of samples** with a documented shape (timestamp, numeric channels, metadata such as place/id).
+A Connection is a Connector instance on the canvas. The feed exposes a **stream or poll of samples** with a documented shape (timestamp, numeric channels, metadata such as place/id).
 
-### 6.2 Transform / processor
+### 6.2 Modulation (mapping on the edge)
 
-Nodes that map, filter, scale, combine, or gate signals (e.g. magnitude → frequency, threshold, smoothing, mix).
+A Modulation is the graph edge from a Connection to an Oscillator. It holds the mapping (for example mag to frequency). Separate transform nodes can come later.
 
-### 6.3 Sound generator
+### 6.3 Oscillator
 
-Nodes that produce audio from control signals (oscillators, noise, amplitude/frequency modulation, etc.). Web Audio / Elementary-style graphs are the expected runtime.
+An Oscillator is a canvas node that produces sound from control signals. Web Audio and Elementary-style graphs are the expected runtime.
 
-### 6.4 Pipeline (patch)
+### 6.4 Patch
 
-A directed graph of nodes and edges on the canvas. A pipeline is the unit of authorship and the primary artifact users save.
+A directed graph of nodes and edges on the canvas. A patch is the unit of authorship and the primary artifact users save.
 
 ### 6.5 User
 
-Authenticated identity that owns saved pipelines (and later preferences). Auth implementation (e.g. Google OAuth) is product glue; the domain model keeps User thin (identity + ownership), not OAuth protocol details.
+Authenticated identity that owns saved patches (and later preferences). Auth implementation (e.g. Google OAuth) is product glue; the domain model keeps User thin (identity + ownership), not OAuth protocol details.
 
 ## 7. User experience
 
 ### Primary surface: React Flow canvas
 
-- Drag nodes from a palette (sources, transforms, sound)
+- Drag nodes from a palette (Connections, transforms, sound)
 - Connect outputs → inputs with typed or documented edge rules
-- Inspect live values on nodes while a pipeline is running
+- Inspect live values on nodes while a patch is running
 - Start/stop audio (browser autoplay constraints apply)
 
 ### Supporting UX
 
 - Sign in / sign out
-- Save / rename / open / delete pipelines
+- Save / rename / open / delete patches
 - Basic validation when connections or required config are invalid
-- Clear empty state: e.g. “Add a source and a sound node to begin”
+- Clear empty state: e.g. “Add a Connection and a sound node to begin”
 
 ### Out of canvas (later)
 
-- Source catalog documentation
+- Connector catalog documentation
 - Sharing and discovery
 
 ## 8. Functional requirements
 
 ### Must have (MVP direction)
 
-1. **Canvas editor** using React Flow to create/edit a pipeline graph
-2. **At least two distinct source types** *or* one real source plus a clear extension path—product intent is multi-source; MVP may ship one live source plus stubs/fixtures if needed
-3. **At least one sound generator** driven by pipeline signals
+1. **Canvas editor** using React Flow to create/edit a patch graph
+2. **At least two distinct source types** *or* one real Connector plus a clear extension path—product intent is multi-source; MVP may ship one live Connector plus stubs/fixtures if needed
+3. **At least one sound generator** driven by patch signals
 4. **Live runtime** that executes the graph (poll/stream → transforms → audio)
 5. **Auth** so a user can sign in (Google OAuth is acceptable/desired)
-6. **Persistence** of pipelines owned by a user (create, read, update, delete)
-7. **Domain model** for User, Pipeline/graph structure, and Source kinds suitable for Clay-driven generation of types/API surfaces
+6. **Persistence** of patches owned by a user (create, read, update, delete)
+7. **Domain model** for User, Patch/graph structure, and Connector kinds suitable for Clay-driven generation of types/API surfaces
 
 ### Should have
 
@@ -147,7 +147,7 @@ Agreed leaning for implementation (detail belongs in architecture docs / Clay ge
 | Canvas | React Flow |
 | Language | TypeScript (client and server) |
 | API | tRPC (type-safe client/server) preferred over ad-hoc REST |
-| Data | PostgreSQL for users and saved pipelines |
+| Data | PostgreSQL for users and saved patches |
 | Audio | Web Audio; Elementary (or similar) as in v1 PoC |
 | Live feeds | Server-mediated poll/stream where needed (CORS, rate limits, secrets) |
 | Codegen | Clay for model-driven types, mutations, and repetitive surfaces |
@@ -158,7 +158,7 @@ Agreed leaning for implementation (detail belongs in architecture docs / Clay ge
 
 **Decision:** every domain mutation (Clay command / tRPC mutation that writes) runs in a **single database transaction**.
 
-**Why (even without multiplayer canvas):** one user can still race themselves via autosave, multi-tab, or retries. Graph edits often touch multiple rows (e.g. remove a Connection and its Modulations). Transactions give atomicity; overlapping saves should additionally use a cheap optimistic check (`pipeline.version` or `updatedAt`) so last-write-wins is explicit rather than silent corruption. True co-editing (CRDT/OT) is out of scope until needed.
+**Why (even without multiplayer canvas):** one user can still race themselves via autosave, multi-tab, or retries. Graph edits often touch multiple rows (e.g. remove a Connection and its Modulations). Transactions give atomicity; overlapping saves should additionally use a cheap optimistic check (`patch.version` or `updatedAt`) so last-write-wins is explicit rather than silent corruption. True co-editing (CRDT/OT) is out of scope until needed.
 
 **How we will enforce it (not yet implemented):**
 
@@ -174,27 +174,27 @@ v1 PoC reference: USGS → SSE sample stream → magnitude-to-frequency tone. Re
 
 MVP is successful when:
 
-1. A signed-in user can build a pipeline on the canvas that produces sound from a natural data source
-2. They can save that pipeline, refresh the browser, and restore it
-3. Adding a second source kind is mostly a matter of registering a new source module + model entry—not rewriting the app
+1. A signed-in user can build a patch on the canvas that produces sound from a natural data source
+2. They can save that patch, refresh the browser, and restore it
+3. Adding a second Connector kind is mostly a matter of registering a new Connector module + model entry—not rewriting the app
 4. Generated vs hand-written boundaries are respected (agents/tools do not hand-edit Clay outputs)
 
 ## 11. Milestones (suggested)
 
 | Milestone | Outcome |
 | --- | --- |
-| M0 — Model & docs | PRD + Clay domain sketch (User, Pipeline, Source, core mutations) |
+| M0 — Model & docs | PRD + Clay domain sketch (User, Patch, Connector, core mutations) |
 | M1 — Shell | Vite app + React Flow empty canvas + auth stub/real OAuth |
-| M2 — Runtime | Execute a minimal graph end-to-end (one source → one sound) |
-| M3 — Persist | Save/load pipelines for authenticated users |
-| M4 — Multi-source | Second real source + clearer source plugin/model pattern |
+| M2 — Runtime | Execute a minimal graph end-to-end (one Connection → one Oscillator) |
+| M3 — Persist | Save/load patches for authenticated users |
+| M4 — Multi-source | Second real Connector + clearer source plugin/model pattern |
 
 ## 12. Open questions
 
 1. What is the **canonical saved artifact**—full React Flow document JSON, a normalized domain graph, or both?
 2. Which **second source** should follow earthquakes for the multi-source story?
 3. How much **audio graph** detail lives in the domain model vs. opaque node config blobs?
-4. Are pipelines **private-only** at MVP, or is share-by-link in scope?
+4. Are patches **private-only** at MVP, or is share-by-link in scope?
 5. Server-authoritative runtime vs. **client-pulled** data with server only for auth/persistence?
 
 ## 13. References
