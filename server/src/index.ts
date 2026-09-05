@@ -39,11 +39,6 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', service: 'earthbeat', authMode: getAuthMode() });
 });
 
-if (getAuthMode() === 'google') {
-  // Express 5 path-to-regexp requires a named splat, not a bare "*".
-  app.use('/api/auth/{*authPath}', createAuthMiddleware());
-}
-
 app.post('/api/auth/local', async (_req: Request, res: Response) => {
   if (getAuthMode() === 'google') {
     res.status(400).json({ error: 'Local auth disabled when AUTH_MODE=google' });
@@ -57,6 +52,12 @@ app.get('/api/auth/session', async (req: Request, res: Response) => {
   const user = await resolveRequestUser(req);
   res.json({ user, authMode: getAuthMode() });
 });
+
+if (getAuthMode() === 'google') {
+  // Express 5 path-to-regexp requires a named splat, not a bare "*".
+  // Register after /session and /local so Auth.js does not swallow those routes.
+  app.use('/api/auth/{*authPath}', createAuthMiddleware());
+}
 
 app.use(
   '/api/trpc',

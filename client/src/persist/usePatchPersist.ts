@@ -45,6 +45,16 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
       try {
         const sessionResponse = await fetch('/api/auth/session', { credentials: 'include' });
         if (!sessionResponse.ok) {
+          // Auth.js can own /api/auth/* when mounted first; fall back to health for mode.
+          try {
+            const healthResponse = await fetch('/api/health');
+            if (healthResponse.ok) {
+              const healthBody = (await healthResponse.json()) as { authMode?: string };
+              if (healthBody.authMode) setAuthMode(healthBody.authMode);
+            }
+          } catch {
+            // Keep prior authMode.
+          }
           setSessionReady(false);
           return;
         }
