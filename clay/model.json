@@ -156,8 +156,8 @@
         "targetParam": "frequencyHz",
         "inMin": 1,
         "inMax": 8,
-        "outMin": 110,
-        "outMax": 880
+        "outMin": 0.5,
+        "outMax": 4
       }
     },
     "types": [
@@ -579,7 +579,10 @@
             "min": 20,
             "max": 2000,
             "default": 220,
-            "description": "Oscillator frequency in Hz. Drives el.phasor in the Elementary graph."
+            "modulationKind": "ratio",
+            "modulationOutMin": 0.5,
+            "modulationOutMax": 4,
+            "description": "Oscillator base frequency in Hz. Modulators that target this field multiply it by a mapped ratio."
           },
           {
             "name": "gain",
@@ -590,6 +593,9 @@
             "min": 0,
             "max": 1,
             "default": 0.2,
+            "modulationKind": "absolute",
+            "modulationOutMin": 0,
+            "modulationOutMax": 1,
             "description": "Output amplitude scale (0 to 1)."
           }
         ],

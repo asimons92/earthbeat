@@ -92,8 +92,8 @@ export const modulatorDefaults = {
   "targetParam": "frequencyHz",
   "inMin": 1,
   "inMax": 8,
-  "outMin": 110,
-  "outMax": 880
+  "outMin": 0.5,
+  "outMax": 4
 } as const;
 
 export const oscillatorModulatableParams = [
@@ -101,13 +101,19 @@ export const oscillatorModulatableParams = [
     "key": "frequencyHz",
     "label": "Frequency (Hz)",
     "min": 20,
-    "max": 2000
+    "max": 2000,
+    "modulationKind": "ratio",
+    "modulationOutMin": 0.5,
+    "modulationOutMax": 4
   },
   {
     "key": "gain",
     "label": "Gain",
     "min": 0,
-    "max": 1
+    "max": 1,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0,
+    "modulationOutMax": 1
   }
 ] as const;
 

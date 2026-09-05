@@ -164,6 +164,8 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
 
   const syncTransportSideEffects = useCallback(
     async (next: PatchTransportState, prev: PatchTransportState) => {
+      // Keep the ref in sync before any voice work. React state effects run later.
+      transportRef.current = next;
       const hold = shouldHoldSharedStream(next);
       if (hold) {
         await ensureEngine();
@@ -183,7 +185,10 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         }
       }
 
-      await applySampleToVoices(sampleRef.current);
+      // Only drive playing voices. Re-applying after stop would unmute the base tone.
+      if (hold) {
+        await applySampleToVoices(sampleRef.current);
+      }
     },
     [applySampleToVoices, connectStream, disconnectStream, ensureEngine],
   );

@@ -26,23 +26,22 @@ function channelFromSample(sample: EarthquakeSample, channelKey: string): number
 }
 
 /**
- * Map a channel onto absolute outMin/outMax, then recenter so the Oscillator
- * frequencyHz is the audible base (midpoint of the Modulator out range).
+ * Map a channel onto a ratio range, then multiply the Oscillator base frequency.
+ * outMin/outMax are multipliers (for example 0.5 to 4), not absolute Hz.
  */
 export function modulateFrequencyFromBase(
   channelValue: number | null | undefined,
   inMin: number,
   inMax: number,
-  outMin: number,
-  outMax: number,
+  ratioMin: number,
+  ratioMax: number,
   baseFrequencyHz: number,
 ): number {
   if (channelValue === null || channelValue === undefined || Number.isNaN(channelValue)) {
     return baseFrequencyHz;
   }
-  const mapped = mapRange(channelValue, inMin, inMax, outMin, outMax);
-  const mid = (outMin + outMax) / 2;
-  return Math.max(MIN_AUDIBLE_HZ, baseFrequencyHz + (mapped - mid));
+  const ratio = mapRange(channelValue, inMin, inMax, ratioMin, ratioMax);
+  return Math.max(MIN_AUDIBLE_HZ, baseFrequencyHz * ratio);
 }
 
 export function resolveVoiceParams(

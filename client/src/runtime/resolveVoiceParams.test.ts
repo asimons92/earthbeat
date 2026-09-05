@@ -20,6 +20,7 @@ const sampleArb = fc.record({
 }) satisfies fc.Arbitrary<EarthquakeSample>;
 
 const audioHz = fc.integer({ min: 40, max: 2000 });
+const ratioArb = fc.double({ min: 0.1, max: 8, noNaN: true, noDefaultInfinity: true });
 
 describe('modulateFrequencyFromBase', () => {
   it('returns the base frequency when the channel is missing', () => {
@@ -28,40 +29,58 @@ describe('modulateFrequencyFromBase', () => {
         fc.constantFrom(null, undefined, Number.NaN),
         audioHz,
         audioHz,
+        ratioArb,
+        ratioArb,
         audioHz,
-        audioHz,
-        audioHz,
-        (channel, inMin, inMax, outMin, outMax, base) => {
-          expect(modulateFrequencyFromBase(channel, inMin, inMax, outMin, outMax, base)).toBe(base);
+        (channel, inMin, inMax, ratioMin, ratioMax, base) => {
+          expect(modulateFrequencyFromBase(channel, inMin, inMax, ratioMin, ratioMax, base)).toBe(
+            base,
+          );
         },
       ),
     );
   });
 
-  it('shifts the mapped absolute Hz by the same delta as the base frequency', () => {
+  it('multiplies the base by the mapped ratio', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 0, max: 10 }),
         audioHz,
         audioHz,
+        ratioArb,
+        ratioArb,
         audioHz,
-        audioHz,
-        audioHz,
-        audioHz,
-        (channel, inMin, inMax, outMin, outMax, baseA, baseB) => {
+        (channel, inMin, inMax, ratioMin, ratioMax, base) => {
           fc.pre(inMin !== inMax);
-          const freqA = modulateFrequencyFromBase(channel, inMin, inMax, outMin, outMax, baseA);
-          const freqB = modulateFrequencyFromBase(channel, inMin, inMax, outMin, outMax, baseB);
-          const mapped = mapRange(channel, inMin, inMax, outMin, outMax);
-          const mid = (outMin + outMax) / 2;
-          const unclampedA = baseA + (mapped - mid);
-          const unclampedB = baseB + (mapped - mid);
+          const freq = modulateFrequencyFromBase(channel, inMin, inMax, ratioMin, ratioMax, base);
+          const ratio = mapRange(channel, inMin, inMax, ratioMin, ratioMax);
           const minHz = 20;
-          const expectA = Math.max(minHz, unclampedA);
-          const expectB = Math.max(minHz, unclampedB);
-          expect(freqA).toBe(expectA);
-          expect(freqB).toBe(expectB);
-          expect(freqB - freqA).toBe(expectB - expectA);
+          const expected = Math.max(minHz, base * ratio);
+          expect(freq).toBe(expected);
+        },
+      ),
+    );
+  });
+
+  it('scales audible Hz in proportion to the base for a fixed channel and ratios', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 8 }),
+        audioHz,
+        audioHz,
+        ratioArb,
+        ratioArb,
+        audioHz,
+        audioHz,
+        (channel, inMin, inMax, ratioMin, ratioMax, baseA, baseB) => {
+          fc.pre(inMin !== inMax);
+          fc.pre(baseA > 0 && baseB > 0);
+          const freqA = modulateFrequencyFromBase(channel, inMin, inMax, ratioMin, ratioMax, baseA);
+          const freqB = modulateFrequencyFromBase(channel, inMin, inMax, ratioMin, ratioMax, baseB);
+          const ratio = mapRange(channel, inMin, inMax, ratioMin, ratioMax);
+          const minHz = 20;
+          fc.pre(baseA * ratio >= minHz && baseB * ratio >= minHz);
+          expect(freqA / baseA).toBeCloseTo(freqB / baseB, 10);
         },
       ),
     );
@@ -94,7 +113,7 @@ describe('resolveVoiceParams', () => {
     );
   });
 
-  it('uses oscillator frequencyHz as the base when mag modulates frequencyHz', () => {
+  it('multiplies oscillator frequencyHz by the mapped ratio for mag→frequencyHz', () => {
     fc.assert(
       fc.property(
         idArb,
@@ -107,8 +126,8 @@ describe('resolveVoiceParams', () => {
           const restingGain = 0.2;
           const inMin = 1;
           const inMax = 8;
-          const outMin = 110;
-          const outMax = 880;
+          const outMin = 0.5;
+          const outMax = 4;
           const nodes: RuntimeNode[] = [
             { id: connId, type: 'connector', data: { kindKey: 'usgs_earthquakes' } },
             {

@@ -8,6 +8,11 @@
       label: field.label || helpers.startCase(field.name),
       min: field.min,
       max: field.max,
+      modulationKind: field.modulationKind || 'absolute',
+      modulationOutMin:
+        field.modulationOutMin !== undefined ? field.modulationOutMin : field.min,
+      modulationOutMax:
+        field.modulationOutMax !== undefined ? field.modulationOutMax : field.max,
     }));
   const shell = catalog.shell || {};
   const dump = (value) => JSON.stringify(value, null, 2);

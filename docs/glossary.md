@@ -42,4 +42,4 @@ Do not put mapping parameters on React Flow edges. Mapping belongs on a Modulato
 
 Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with Elementary as the audio runtime. Modulatable params are `frequencyHz` and `gain`.
 
-Modulator defaults map `mag` to `frequencyHz` with in range 1 to 8 and out range 110 to 880.
+Modulator defaults map `mag` to `frequencyHz` with in range 1 to 8 and out ratio range 0.5× to 4× of the Oscillator base frequency.

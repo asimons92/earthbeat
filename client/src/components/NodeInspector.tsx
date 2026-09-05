@@ -26,7 +26,11 @@ function modulatorStatus(data: {
   outMin: number;
   outMax: number;
 }) {
-  return `${data.inMin}–${data.inMax} → ${data.outMin}–${data.outMax}`;
+  const outIsRatio = data.targetParam === 'frequencyHz';
+  const outRange = outIsRatio
+    ? `${data.outMin}×–${data.outMax}×`
+    : `${data.outMin}–${data.outMax}`;
+  return `${data.inMin}–${data.inMax} → ${outRange}`;
 }
 
 function modulatorLabel(channelKey: string, targetParam: string) {
@@ -114,8 +118,8 @@ export function NodeInspector({
         next.inMax = 'mapHintMax' in channel ? Number(channel.mapHintMax) : Number(channel.max);
       }
       if (patch.targetParam && target) {
-        next.outMin = target.min;
-        next.outMax = target.max;
+        next.outMin = target.modulationOutMin;
+        next.outMax = target.modulationOutMax;
       }
       next.label = modulatorLabel(next.channelKey, next.targetParam);
       next.status = modulatorStatus(next);
@@ -202,19 +206,25 @@ export function NodeInspector({
 
         <div className="inspector__row">
           <div className="inspector__field">
-            <Label htmlFor="modulator-out-min">Out min</Label>
+            <Label htmlFor="modulator-out-min">
+              {data.targetParam === 'frequencyHz' ? 'Ratio min' : 'Out min'}
+            </Label>
             <Input
               id="modulator-out-min"
               type="number"
+              step={data.targetParam === 'frequencyHz' ? '0.1' : undefined}
               value={data.outMin}
               onChange={(event) => patchModulator({ outMin: Number(event.target.value) })}
             />
           </div>
           <div className="inspector__field">
-            <Label htmlFor="modulator-out-max">Out max</Label>
+            <Label htmlFor="modulator-out-max">
+              {data.targetParam === 'frequencyHz' ? 'Ratio max' : 'Out max'}
+            </Label>
             <Input
               id="modulator-out-max"
               type="number"
+              step={data.targetParam === 'frequencyHz' ? '0.1' : undefined}
               value={data.outMax}
               onChange={(event) => patchModulator({ outMax: Number(event.target.value) })}
             />

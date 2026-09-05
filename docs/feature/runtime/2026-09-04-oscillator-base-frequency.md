@@ -1,7 +1,7 @@
 # Oscillator frequency as audible base
 
 Date: 2026-09-04
-Status: decided
+Status: superseded
 
 ## Context
 
@@ -17,4 +17,4 @@ The Frequency control on the Oscillator must retune the tone even while the live
 
 ## Follow-up
 
-See `2026-09-04-m2-usgs-elementary.md`.
+Superseded by `2026-09-04-frequency-ratio-modulation.md`.
