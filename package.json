@@ -1,6 +1,9 @@
 {
   "name": "earthbeat_2",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "pnpm --parallel --filter client --filter server dev",
     "dev:client": "pnpm --dir client dev",
