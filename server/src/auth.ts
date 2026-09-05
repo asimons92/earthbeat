@@ -42,6 +42,7 @@ export async function bootstrapLocalSession(): Promise<User> {
 export const authConfig: ExpressAuthConfig = {
   basePath: '/api/auth',
   secret: process.env.AUTH_SECRET,
+  // Railway terminates TLS; trust X-Forwarded-Host / proto for Auth.js URL building.
   trustHost: true,
   providers: [
     Google({

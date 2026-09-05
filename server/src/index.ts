@@ -54,9 +54,9 @@ app.get('/api/auth/session', async (req: Request, res: Response) => {
 });
 
 if (getAuthMode() === 'google') {
-  // Express 5 path-to-regexp requires a named splat, not a bare "*".
-  // Register after /session and /local so Auth.js does not swallow those routes.
-  app.use('/api/auth/{*authPath}', createAuthMiddleware());
+  // Mount at /api/auth (no splat). @auth/express getBasePath expects Express mount
+  // semantics; a named /{*authPath} splat made Auth.js parse actions as UnknownAction.
+  app.use('/api/auth', createAuthMiddleware());
 }
 
 app.use(
