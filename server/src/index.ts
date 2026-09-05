@@ -6,6 +6,7 @@ import cors from 'cors';
 import express, { type NextFunction, type Request, type Response } from 'express';
 
 import {
+  assertAuthReady,
   bootstrapLocalSession,
   createAuthMiddleware,
   getAuthMode,
@@ -14,11 +15,16 @@ import {
 import { EarthquakeStream, type EarthquakeSample } from './earthquakeStream.js';
 import { appRouter } from './generated/router.js';
 import { ensureSchema } from './migrate.js';
+import {
+  createSseConnectionGate,
+  DEFAULT_SSE_MAX_CONNECTIONS,
+} from './sseConnectionGate.js';
 import { classifyRequestPath, resolveClientDistDir } from './staticSite.js';
 import { DEFAULT_PLAYBACK_HZ, DEFAULT_POLL_INTERVAL_MS } from './usgs.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
+const sseGate = createSseConnectionGate(DEFAULT_SSE_MAX_CONNECTIONS);
 
 app.set('trust proxy', true);
 app.use(
@@ -72,6 +78,11 @@ earthquakeStream.on('error', (error) => {
 });
 
 app.get('/api/earthquakes/stream', (req: Request, res: Response) => {
+  if (!sseGate.tryAcquire()) {
+    res.status(503).json({ error: 'Earthquake stream connection limit reached' });
+    return;
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -85,6 +96,7 @@ app.get('/api/earthquakes/stream', (req: Request, res: Response) => {
 
   req.on('close', () => {
     earthquakeStream.off('sample', onSample);
+    sseGate.release();
   });
 });
 
@@ -101,6 +113,7 @@ if (clientDist) {
 }
 
 async function main() {
+  assertAuthReady();
   await ensureSchema();
   if (getAuthMode() !== 'google') {
     await bootstrapLocalSession();

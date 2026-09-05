@@ -2,6 +2,10 @@ import { sql } from 'drizzle-orm';
 
 import { db, pool } from './db.js';
 
+/** Unique identity for Auth.js / local provider subjects (also applied via IF NOT EXISTS for existing DBs). */
+export const USERS_PROVIDER_SUBJECT_UNIQUE_INDEX_SQL =
+  'CREATE UNIQUE INDEX IF NOT EXISTS users_provider_subject_uidx ON users (provider, provider_subject)';
+
 /** Create tables if they do not exist (M3 bootstrap; replace with migrations later). */
 export async function ensureSchema(): Promise<void> {
   await db.execute(sql`
@@ -15,6 +19,10 @@ export async function ensureSchema(): Promise<void> {
       created_at timestamptz NOT NULL,
       updated_at timestamptz NOT NULL
     );
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_provider_subject_uidx
+    ON users (provider, provider_subject)
   `);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS patches (

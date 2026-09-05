@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { TRPCClientError } from '@trpc/client';
 
+import { decideSessionBootstrap } from '@/persist/sessionBootstrap';
 import { domainGraphToFlow, flowToDomainGraph } from '@/persist/graphMapper';
 import { trpc } from '@/trpc';
 
@@ -41,12 +42,36 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetch('/api/auth/local', { method: 'POST', credentials: 'include' });
-        if (!response.ok) {
+        const sessionResponse = await fetch('/api/auth/session', { credentials: 'include' });
+        if (!sessionResponse.ok) {
           setSessionReady(false);
           return;
         }
-        setSessionReady(true);
+        const sessionBody = (await sessionResponse.json()) as {
+          user?: { id?: string } | null;
+          authMode?: string;
+        };
+        const decision = decideSessionBootstrap({
+          user: sessionBody.user,
+          authMode: sessionBody.authMode ?? 'local',
+        });
+        if (decision === 'ready') {
+          setSessionReady(true);
+          return;
+        }
+        if (decision === 'needsLocalPost') {
+          const localResponse = await fetch('/api/auth/local', {
+            method: 'POST',
+            credentials: 'include',
+          });
+          if (!localResponse.ok) {
+            setSessionReady(false);
+            return;
+          }
+          setSessionReady(true);
+          return;
+        }
+        setSessionReady(false);
       } catch {
         setSessionReady(false);
       }

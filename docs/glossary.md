@@ -26,7 +26,7 @@ Monitor is the output panel under the canvas. It shows frequency, level, and a w
 
 ## Verbs
 
-upsertFromAuth creates or updates a User from a provider profile.
+upsertFromAuth creates or updates a User from a provider profile on the server (Auth.js or local bootstrap). It is not a public tRPC procedure.
 
 create, rename, delete, list, get, and replaceGraph act on a Patch. replaceGraph saves the full node and Wire set in one transaction and bumps Patch.version.
 

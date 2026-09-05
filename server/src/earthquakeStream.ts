@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 
+import { pruneSeenIds } from './pruneSeenIds.js';
 import {
   DEFAULT_PLAYBACK_HZ,
   DEFAULT_POLL_INTERVAL_MS,
@@ -76,6 +77,11 @@ export class EarthquakeStream extends EventEmitter {
     }
   }
 
+  /** Test helper: current seen id count after prune cycles. */
+  getSeenIdCount(): number {
+    return this.seenIds.size;
+  }
+
   private async refresh(): Promise<void> {
     if (this.refreshing) {
       return;
@@ -84,6 +90,9 @@ export class EarthquakeStream extends EventEmitter {
     try {
       const feed = await fetchDailyEarthquakes();
       const appended = this.appendNewEarthquakes(feed.features);
+      const feedIds = feed.features.map((feature) => feature.id);
+      const queueIds = this.queue.map((sample) => sample.id);
+      pruneSeenIds(this.seenIds, feedIds, queueIds);
       if (appended > 0) {
         this.emit('refresh', { appended, queueLength: this.queue.length });
       }

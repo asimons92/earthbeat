@@ -8,7 +8,7 @@ The first ConnectorKind (catalog entry for a natural-signal API) is `usgs_earthq
 
 ## Status
 
-M3 is in place: Clay-generated tRPC + Drizzle persist Patches in Postgres. Local auth seeds a development user. Google OAuth via Auth.js is available when AUTH_MODE=google. M2 USGS SSE and Elementary playback remain.
+M3 is in place: Clay-generated tRPC + Drizzle persist Patches in Postgres. Local auth seeds a development user. Google OAuth via Auth.js is required when NODE_ENV=production (AUTH_MODE=google plus secrets). M2 USGS SSE and Elementary playback remain.
 
 See `docs/PRD.md` for milestones and `docs/feature/persist/` for M3 decisions.
 

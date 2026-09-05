@@ -3,17 +3,22 @@ import Google from '@auth/express/providers/google';
 import { eq } from 'drizzle-orm';
 import type { Request } from 'express';
 
+import { assertAuthConfigForEnv, resolveAuthMode } from './authConfig.js';
 import { db } from './db.js';
 import { userUpsertFromAuth } from './generated/handlers.js';
 import { users } from './generated/schema.js';
 import type { User } from './generated/types.js';
 
-const authMode = process.env.AUTH_MODE ?? 'local';
+const authMode = resolveAuthMode(process.env);
 
 let cachedLocalUser: User | null = null;
 
 export function getAuthMode(): string {
   return authMode;
+}
+
+export function assertAuthReady(): void {
+  assertAuthConfigForEnv(process.env);
 }
 
 export async function ensureLocalUser(): Promise<User> {

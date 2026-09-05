@@ -18,9 +18,11 @@ pnpm --dir server migrate
 
 ## Auth
 
-`AUTH_MODE=local` (default) seeds one development user and does not need Google credentials.
+`AUTH_MODE=local` (default in development) seeds one development user and does not need Google credentials.
 
 `AUTH_MODE=google` mounts Auth.js at `/api/auth/*`. Set `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`. Google callback URL: `{origin}/api/auth/callback/google`.
+
+When `NODE_ENV=production`, the server refuses to start unless `AUTH_MODE=google` and those secrets are set.
 
 ## API
 

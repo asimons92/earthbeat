@@ -13,6 +13,7 @@ import {
   type EarthquakeSample,
 } from './resolveVoiceParams';
 import type { RuntimeEdge, RuntimeNode } from './modulationChain';
+import { planVoiceCleanup } from './voiceCleanup';
 
 export type LiveStatus = 'off' | 'connecting' | 'live' | 'error';
 
@@ -230,6 +231,27 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   const stopAllOscillators = useCallback(() => {
     dispatchTransport({ type: 'stopAll' });
   }, [dispatchTransport]);
+
+  useEffect(() => {
+    const graphOscillatorIds = new Set(
+      nodes.filter((node) => node.type === 'oscillator').map((node) => node.id),
+    );
+    const engine = engineRef.current;
+    const engineVoiceIds = new Set(engine?.listVoiceIds() ?? []);
+    const { stopIds, removeIds } = planVoiceCleanup(
+      graphOscillatorIds,
+      transport.playingOscillatorIds,
+      engineVoiceIds,
+    );
+    for (const id of stopIds) {
+      dispatchTransport({ type: 'stop', oscillatorId: id });
+    }
+    if (engine) {
+      for (const id of removeIds) {
+        void engine.removeVoice(id);
+      }
+    }
+  }, [nodes, dispatchTransport, transport.playingOscillatorIds]);
 
   useEffect(() => {
     if (!shouldHoldSharedStream(transport)) return;

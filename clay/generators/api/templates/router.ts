@@ -15,7 +15,6 @@ import {
   patchList,
   patchRename,
   patchReplaceGraph,
-  userUpsertFromAuth,
 } from './handlers.js';
 
 const t = initTRPC.context<TrpcContext>().create();
@@ -89,23 +88,6 @@ const wireSchema = z.object({
 export const appRouter = t.router({
   user: t.router({
     me: authed.query(({ ctx }) => ctx.user),
-    upsertFromAuth: t.procedure
-      .input(
-        z.object({
-          email: z.string().email(),
-          name: z.string().optional(),
-          image: z.string().optional(),
-          provider: z.string(),
-          providerSubject: z.string(),
-        }),
-      )
-      .mutation(async ({ input }) => {
-        try {
-          return await userUpsertFromAuth(input);
-        } catch (error) {
-          mapError(error);
-        }
-      }),
   }),
   patch: t.router({
     list: authed.query(async ({ ctx }) => {

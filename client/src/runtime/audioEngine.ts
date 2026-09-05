@@ -10,6 +10,8 @@ export type PatchAudioEngine = {
   ctx: AudioContext;
   ensureVoice: (oscillatorId: string, initialFreqHz: number, initialGain: number) => Promise<VoiceControls>;
   setVoiceAudible: (oscillatorId: string, audible: boolean) => Promise<void>;
+  removeVoice: (oscillatorId: string) => Promise<void>;
+  listVoiceIds: () => string[];
   dispose: () => Promise<void>;
 };
 
@@ -114,6 +116,16 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     await voice.setGainProps({ value: audible ? voice.lastGain : 0 });
   }
 
+  async function removeVoice(oscillatorId: string) {
+    if (!voices.has(oscillatorId)) return;
+    voices.delete(oscillatorId);
+    await rebuildGraph();
+  }
+
+  function listVoiceIds() {
+    return [...voices.keys()];
+  }
+
   async function dispose() {
     voices.clear();
     await ctx.close();
@@ -123,6 +135,8 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     ctx,
     ensureVoice,
     setVoiceAudible,
+    removeVoice,
+    listVoiceIds,
     dispose,
   };
 }
