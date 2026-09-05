@@ -15,6 +15,8 @@ type UsePatchPersistArgs = {
   setEdges: (edges: Edge[] | ((current: Edge[]) => Edge[])) => void;
 };
 
+type SaveReason = 'manual' | 'auto';
+
 export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPersistArgs) {
   const [activePatchId, setActivePatchId] = useState<string | null>(null);
   const [activePatchName, setActivePatchName] = useState('Untitled Patch');
@@ -27,6 +29,9 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const edgesRef = useRef(edges);
   const versionRef = useRef(patchVersion);
   const patchIdRef = useRef(activePatchId);
+  const dirtyRef = useRef(false);
+  const saveInFlightRef = useRef(false);
+  const ignoreNextGraphEffectRef = useRef(false);
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -39,13 +44,23 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const listQuery = trpc.patch.list.useQuery(undefined, { enabled: sessionReady });
   const createMutation = trpc.patch.create.useMutation();
   const replaceMutation = trpc.patch.replaceGraph.useMutation();
+  const replaceMutateRef = useRef(replaceMutation.mutateAsync);
+  const createMutateRef = useRef(createMutation.mutateAsync);
+  const invalidateListRef = useRef(utils.patch.list.invalidate);
+  const fetchPatchRef = useRef(utils.patch.get.fetch);
+
+  useEffect(() => {
+    replaceMutateRef.current = replaceMutation.mutateAsync;
+    createMutateRef.current = createMutation.mutateAsync;
+    invalidateListRef.current = utils.patch.list.invalidate;
+    fetchPatchRef.current = utils.patch.get.fetch;
+  }, [replaceMutation.mutateAsync, createMutation.mutateAsync, utils.patch.list.invalidate, utils.patch.get.fetch]);
 
   useEffect(() => {
     void (async () => {
       try {
         const sessionResponse = await fetch('/api/auth/session', { credentials: 'include' });
         if (!sessionResponse.ok) {
-          // Auth.js can own /api/auth/* when mounted first; fall back to health for mode.
           try {
             const healthResponse = await fetch('/api/health');
             if (healthResponse.ok) {
@@ -91,13 +106,16 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     })();
   }, []);
 
-  const saveNow = useCallback(async () => {
+  const saveNow = useCallback(async (reason: SaveReason = 'manual') => {
     const patchId = patchIdRef.current;
     if (!patchId) return;
+    if (reason === 'auto' && !dirtyRef.current) return;
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setPersistStatus('saving');
     const graph = flowToDomainGraph(patchId, nodesRef.current, edgesRef.current);
     try {
-      const result = await replaceMutation.mutateAsync({
+      const result = await replaceMutateRef.current({
         id: patchId,
         expectedVersion: versionRef.current,
         connectors: graph.connectors,
@@ -106,33 +124,42 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         wires: graph.wires,
       });
       setPatchVersion(Number(result.version));
+      dirtyRef.current = false;
       setPersistStatus('saved');
-      await utils.patch.list.invalidate();
+      await invalidateListRef.current();
     } catch (error) {
       if (error instanceof TRPCClientError && error.data?.code === 'CONFLICT') {
         setPersistStatus('conflict');
       } else {
         setPersistStatus('error');
       }
+    } finally {
+      saveInFlightRef.current = false;
     }
-  }, [replaceMutation, utils.patch.list]);
+  }, []);
 
   const scheduleAutosave = useCallback(() => {
     if (!patchIdRef.current) return;
+    if (ignoreNextGraphEffectRef.current) {
+      ignoreNextGraphEffectRef.current = false;
+      dirtyRef.current = false;
+      return;
+    }
+    dirtyRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      void saveNow();
+      void saveNow('auto');
     }, 1200);
   }, [saveNow]);
 
   const createPatch = useCallback(
     async (name: string) => {
-      const created = await createMutation.mutateAsync({ name });
+      const created = await createMutateRef.current({ name });
       setActivePatchId(created.id);
       setActivePatchName(created.name);
       setPatchVersion(Number(created.version));
       const graph = flowToDomainGraph(created.id, nodesRef.current, edgesRef.current);
-      const saved = await replaceMutation.mutateAsync({
+      const saved = await replaceMutateRef.current({
         id: created.id,
         expectedVersion: Number(created.version),
         connectors: graph.connectors,
@@ -141,16 +168,18 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         wires: graph.wires,
       });
       setPatchVersion(Number(saved.version));
+      dirtyRef.current = false;
+      ignoreNextGraphEffectRef.current = true;
       setPersistStatus('saved');
-      await utils.patch.list.invalidate();
+      await invalidateListRef.current();
       return created;
     },
-    [createMutation, replaceMutation, utils.patch.list],
+    [],
   );
 
   const loadPatch = useCallback(
     async (id: string) => {
-      const patch = await utils.patch.get.fetch({ id });
+      const patch = await fetchPatchRef.current({ id });
       setActivePatchId(patch.id);
       setActivePatchName(patch.name);
       setPatchVersion(Number(patch.version));
@@ -160,11 +189,13 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         oscillators: patch.oscillators,
         wires: patch.wires,
       });
+      ignoreNextGraphEffectRef.current = true;
+      dirtyRef.current = false;
       setNodes(nextNodes);
       setEdges(nextEdges);
       setPersistStatus('saved');
     },
-    [setEdges, setNodes, utils.patch.get],
+    [setEdges, setNodes],
   );
 
   const resolveConflictByReload = useCallback(async () => {
@@ -181,7 +212,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     activePatchName,
     patchVersion,
     persistStatus,
-    saveNow,
+    saveNow: () => saveNow('manual'),
     scheduleAutosave,
     createPatch,
     loadPatch,
