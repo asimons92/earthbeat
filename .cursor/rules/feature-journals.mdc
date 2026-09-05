@@ -1,0 +1,21 @@
+---
+description: Read and append feature journals under docs/feature for agent legibility
+alwaysApply: true
+---
+
+# Feature journals
+
+Dated notes for one product area live under `docs/feature/<slug>/`. Full convention: `docs/feature/README.md`.
+
+## Do
+
+- Before you change a feature, read every entry in `docs/feature/<slug>/`
+- After a decision, non-trivial change, or failed approach worth remembering, add `YYYY-MM-DD-short-topic.md`
+- Keep entries append-only. Do not rewrite history. Mark old decisions `Status: superseded` and link from the new entry
+- Use the sections Context, Decision, Why, Follow-up. Write in Simple English
+
+## Do not
+
+- Skip the journal when you change product behavior, domain shape, or UI nouns for that feature
+- Put standing reference docs (glossary, PRD, UI tokens) under `docs/feature/`. Those stay at `docs/`
+- Journal typo fixes or renames with no meaning change
