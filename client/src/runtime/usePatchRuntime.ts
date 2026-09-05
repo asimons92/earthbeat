@@ -22,6 +22,11 @@ import {
   type SampleHistoryState,
 } from './sampleHistory';
 import { planVoiceCleanup } from './voiceCleanup';
+import {
+  canApplyVoice,
+  filterLiveApplyTargets,
+  planStoppedVoiceRemoval,
+} from './voiceStop';
 import { connectorKindKeysFromNodes, streamUrlsForKindKeys } from './streamUrls';
 
 export type LiveStatus = 'off' | 'connecting' | 'live' | 'error';
@@ -110,11 +115,15 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   const applySamplesToVoices = useCallback(async () => {
     const engine = engineRef.current;
     if (!engine) return;
-    const playing = transportRef.current.playingOscillatorIds;
+    const snapshotPlaying = transportRef.current.playingOscillatorIds;
     const runtimeNodes = toRuntimeNodes(nodesRef.current);
     const runtimeEdges = toRuntimeEdges(edgesRef.current);
 
-    for (const oscillatorId of playing) {
+    for (const oscillatorId of filterLiveApplyTargets(
+      snapshotPlaying,
+      transportRef.current.playingOscillatorIds,
+    )) {
+      if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) continue;
       const chain = findModulationChain(runtimeNodes, runtimeEdges, oscillatorId);
       const kindKey =
         chain.complete && typeof chain.connector.data.kindKey === 'string'
@@ -126,9 +135,18 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
       const restingFreq =
         typeof osc?.data.frequencyHz === 'number' ? osc.data.frequencyHz : params.frequencyHz;
       const restingGain = typeof osc?.data.gain === 'number' ? osc.data.gain : params.gain;
+      if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) continue;
       const voice = await engine.ensureVoice(oscillatorId, restingFreq, restingGain);
+      if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) {
+        await engine.removeVoice(oscillatorId);
+        continue;
+      }
       await voice.setFrequency(params.frequencyHz);
       await voice.setGain(params.gain);
+      if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) {
+        await engine.removeVoice(oscillatorId);
+        continue;
+      }
       await engine.setVoiceAudible(oscillatorId, true);
     }
   }, []);
@@ -273,10 +291,11 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
       const engine = engineRef.current;
       if (!engine) return;
 
-      for (const id of prev.playingOscillatorIds) {
-        if (!next.playingOscillatorIds.has(id)) {
-          await engine.setVoiceAudible(id, false);
-        }
+      for (const id of planStoppedVoiceRemoval(
+        prev.playingOscillatorIds,
+        next.playingOscillatorIds,
+      )) {
+        await engine.removeVoice(id);
       }
 
       if (hold) {
