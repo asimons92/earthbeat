@@ -40,7 +40,9 @@ export function appendSampleToHistory(
   const next: SampleHistoryState = { ...history };
   for (const strip of strips) {
     if (strip.kindKey !== sample.kindKey) continue;
-    const value = channelFromSample(sample, strip.channelKey);
+    const value = channelFromSample(sample, strip.channelKey, {
+      interpolate: strip.interpolate,
+    });
     if (value == null || !Number.isFinite(value)) continue;
     const prev = next[strip.id] ?? [];
     const appended = prev.length >= capacity ? [...prev.slice(1), value] : [...prev, value];

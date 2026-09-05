@@ -6,8 +6,19 @@ import { listMonitorStrips } from './monitorStrips';
 
 const idArb = fc.uuid();
 
-function connector(id: string, kindKey: string): RuntimeNode {
-  return { id, type: 'connector', data: { kindKey } };
+function connector(
+  id: string,
+  kindKey: string,
+  interpolate?: boolean,
+): RuntimeNode {
+  return {
+    id,
+    type: 'connector',
+    data: {
+      kindKey,
+      ...(interpolate === undefined ? {} : { interpolate }),
+    },
+  };
 }
 
 function modulator(
@@ -64,10 +75,11 @@ describe('listMonitorStrips', () => {
         idArb,
         mappingArb,
         kindArb,
-        (connId, modId, oscId, mapping, kindKey) => {
+        fc.option(fc.boolean(), { nil: undefined }),
+        (connId, modId, oscId, mapping, kindKey, interpolate) => {
           fc.pre(new Set([connId, modId, oscId]).size === 3);
           const nodes = [
-            connector(connId, kindKey),
+            connector(connId, kindKey, interpolate),
             modulator(modId, mapping),
             oscillator(oscId),
           ];
@@ -82,6 +94,9 @@ describe('listMonitorStrips', () => {
           expect(strips[0]!.kindKey).toBe(kindKey);
           expect(strips[0]!.inMin).toBe(mapping.inMin);
           expect(strips[0]!.inMax).toBe(mapping.inMax);
+          expect(strips[0]!.interpolate).toBe(
+            typeof interpolate === 'boolean' ? interpolate : true,
+          );
         },
       ),
     );

@@ -1,7 +1,12 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
-import type { ConnectorSample, UsgsConnectorSample } from './channelFromSample';
+import {
+  channelFromSample,
+  type ConnectorSample,
+  type NoaaConnectorSample,
+  type UsgsConnectorSample,
+} from './channelFromSample';
 import type { MonitorStrip } from './monitorStrips';
 import {
   appendSampleToHistory,
@@ -19,10 +24,27 @@ const usgsArb: fc.Arbitrary<UsgsConnectorSample> = fc.record({
   time: fc.integer({ min: 0, max: 2_000_000_000_000 }),
 });
 
+const finiteLevel = fc.double({
+  min: -10,
+  max: 10,
+  noNaN: true,
+  noDefaultInfinity: true,
+});
+
+const noaaArb: fc.Arbitrary<NoaaConnectorSample> = fc.record({
+  kindKey: fc.constant('noaa_coops_tides' as const),
+  id: fc.string({ minLength: 1, maxLength: 12 }),
+  stationId: fc.string({ minLength: 1, maxLength: 8 }),
+  waterLevel: fc.option(finiteLevel, { nil: null }),
+  waterLevelStep: fc.option(finiteLevel, { nil: null }),
+  time: fc.integer({ min: 0, max: 2_000_000_000_000 }),
+});
+
 function stripFor(
   id: string,
   kindKey: string,
   channelKey: string,
+  interpolate: boolean = true,
 ): MonitorStrip {
   return {
     id,
@@ -33,6 +55,7 @@ function stripFor(
     label: id,
     connectorId: `c-${id}`,
     oscillatorId: `o-${id}`,
+    interpolate,
   };
 }
 
@@ -94,6 +117,20 @@ describe('sampleHistory', () => {
         const history = appendSampleToHistory(emptySampleHistory(), strips, sample as ConnectorSample);
         const matching = strips.filter((strip) => strip.kindKey === sample.kindKey).length;
         expect(history[stripId]?.length ?? 0).toBe(matching);
+      }),
+    );
+  });
+
+  it('records the same Channel value the Modulator would read for interpolate', () => {
+    fc.assert(
+      fc.property(fc.uuid(), noaaArb, fc.boolean(), (stripId, sample, interpolate) => {
+        const strips = [stripFor(stripId, 'noaa_coops_tides', 'waterLevel', interpolate)];
+        const history = appendSampleToHistory(emptySampleHistory(), strips, sample);
+        const expected = channelFromSample(sample, 'waterLevel', { interpolate });
+        const recorded = history[stripId] ?? [];
+        const expectedSeries =
+          expected != null && Number.isFinite(expected) ? [expected] : [];
+        expect(recorded).toEqual(expectedSeries);
       }),
     );
   });

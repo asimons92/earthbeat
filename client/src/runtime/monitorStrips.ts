@@ -19,6 +19,8 @@ export type MonitorStrip = {
   label: string;
   connectorId: string;
   oscillatorId: string;
+  /** Connector Smooth interpolate; Monitor must match Modulator Channel. */
+  interpolate: boolean;
 };
 
 function channelLabel(kindKey: string, channelKey: string): string {
@@ -43,6 +45,10 @@ export function stripFromChain(chain: ModulationChain): MonitorStrip {
     label: `${kindLabel(kindKey)} · ${channelLabel(kindKey, chain.channelKey)}`,
     connectorId: chain.connector.id,
     oscillatorId: chain.oscillator.id,
+    interpolate:
+      typeof chain.connector.data.interpolate === 'boolean'
+        ? chain.connector.data.interpolate
+        : true,
   };
 }
 
