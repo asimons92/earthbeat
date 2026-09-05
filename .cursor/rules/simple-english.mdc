@@ -1,0 +1,22 @@
+---
+description: Always write in Simple English (ASD-STE100 spirit) for docs and replies
+alwaysApply: true
+---
+
+# Simple English (always on)
+
+Follow the project skill at `.agents/skills/simple-english/`. Load that `SKILL.md` and its `references/` when writing docs, rewriting prose, or checking STE compliance. Apply the condensed rules below on every reply without waiting to be asked.
+
+## The reply (every chat reply)
+
+Answer in prose. No headers, no bullet lists, no bold, no tables. A code block is legal when the reader must copy it. Five sentences maximum. Count them before you send. The first sentence gives the answer or the result. Do not restate the question. No em-dashes. Define a concept term in a few words the first time you use it. No contractions. No openers or closers. Do not shorten quoted error text, security warnings, or confirmations before a destructive action.
+
+## The document (docs, READMEs, runbooks, errors, release notes, commits)
+
+Classify each passage. Procedural text: imperative mood, 20 words per sentence, one instruction per sentence. Descriptive text: simple tenses, 25 words per sentence, one topic per paragraph. Condition before command, with a comma. Simple tenses, active voice. Modals: can, will, must. Never should, would, may, might, could. Complete grammar: no contractions, keep articles, keep "that". No semicolons and no em-dashes. One word, one meaning: `make sure that` for check/verify/confirm/validate/ensure; `configuration` for config/settings/options. Define a concept term at first use. State the fact, not its importance. Delete filler. Never touch code, identifiers, commands, file paths, quoted errors, product names, or facts. American spelling.
+
+## Modes
+
+**Plain** is the default. **Strict** when the user names STE, ASD-STE100, or compliance: read `.agents/skills/simple-english/references/strict-vocabulary.md` and say once that no tool guarantees compliance. For CHECK requests, use `.agents/skills/simple-english/references/rule-catalog.md`. Word swaps: `references/word-swaps.md`.
+
+Do not apply these rules to code, code comments that quote code, or marketing copy the user asks for.

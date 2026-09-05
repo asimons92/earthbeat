@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "simple-english": {
+      "source": "AminBlg/SimpleEnglish",
+      "sourceType": "github",
+      "skillPath": "skills/simple-english/SKILL.md",
+      "computedHash": "8124a69e9d2cf3831fc28d769cf1db7d1f68a76fd655b5f57a9cf942d286c27a"
+    }
+  }
+}

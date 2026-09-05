@@ -1,0 +1,30 @@
+/**
+ * Earthbeat design tokens — only file allowed to define raw colors.
+ * Everywhere else must use var(--token-name).
+ */
+
+:root {
+  /* Surfaces */
+  --bg: #f7f4ee;
+  --bg-panel: #f1eee6;
+  --bg-node: #fff;
+
+  /* Ink / lines */
+  --ink: #121212;
+  --ink-muted: #5c5c5c;
+  --line: #121212;
+  --line-muted: #cfcbc3;
+  --grid-dot: #cfcbc3;
+
+  /* Semantic accents (use sparingly) */
+  --live: #c43c3c;
+  --destructive: #c43c3c;
+
+  /* Type */
+  --font-ui: 'DM Sans', sans-serif;
+  --font-brand: 'Syne', sans-serif;
+
+  /* Geometry */
+  --radius: 6px;
+  --radius-node: 10px;
+}

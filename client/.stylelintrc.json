@@ -1,0 +1,35 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "rules": {
+    "color-no-hex": true,
+    "function-disallowed-list": [
+      "rgb",
+      "rgba",
+      "hsl",
+      "hsla",
+      "hwb",
+      "lab",
+      "lch",
+      "oklab",
+      "oklch",
+      "color",
+      "color-mix"
+    ],
+    "selector-class-pattern": null,
+    "custom-property-pattern": null,
+    "import-notation": null,
+    "media-feature-range-notation": null,
+    "declaration-block-no-redundant-longhand-properties": null,
+    "no-descending-specificity": null,
+    "value-keyword-case": null
+  },
+  "overrides": [
+    {
+      "files": ["**/styles/tokens.css"],
+      "rules": {
+        "color-no-hex": null,
+        "function-disallowed-list": null
+      }
+    }
+  ]
+}
