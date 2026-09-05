@@ -11,6 +11,7 @@ import type { RuntimeEdge, RuntimeNode } from './modulationChain';
 
 const idArb = fc.uuid();
 const sampleArb = fc.record({
+  kindKey: fc.constant('usgs_earthquakes' as const),
   id: fc.string({ minLength: 1, maxLength: 12 }),
   mag: fc.option(fc.double({ min: 0, max: 10, noNaN: true }), { nil: null }),
   depthKm: fc.option(fc.double({ min: 0, max: 700, noNaN: true }), { nil: null }),
@@ -164,6 +165,61 @@ describe('resolveVoiceParams', () => {
           expect(params.modulated).toBe(Boolean(sample));
           expect(params.gain).toBe(restingGain);
           expect(params.frequencyHz).toBe(expectedFreq);
+        },
+      ),
+    );
+  });
+
+  it('ignores a sample whose kindKey does not match the connector', () => {
+    fc.assert(
+      fc.property(
+        idArb,
+        idArb,
+        idArb,
+        sampleArb,
+        fc.record({
+          kindKey: fc.constant('noaa_coops_tides' as const),
+          id: fc.string({ minLength: 1, maxLength: 12 }),
+          stationId: fc.stringMatching(/^[0-9]{7}$/),
+          waterLevel: fc.option(fc.double({ min: -2, max: 4, noNaN: true }), { nil: null }),
+          time: fc.integer({ min: 0, max: 2_000_000_000_000 }),
+        }),
+        audioHz,
+        (connId, modId, oscId, usgsSample, noaaSample, restingFreq) => {
+          fc.pre(new Set([connId, modId, oscId]).size === 3);
+          const restingGain = 0.2;
+          const nodes: RuntimeNode[] = [
+            { id: connId, type: 'connector', data: { kindKey: 'usgs_earthquakes' } },
+            {
+              id: modId,
+              type: 'modulator',
+              data: {
+                channelKey: 'mag',
+                targetParam: 'frequencyHz',
+                inMin: 1,
+                inMax: 8,
+                outMin: 0.5,
+                outMax: 4,
+              },
+            },
+            {
+              id: oscId,
+              type: 'oscillator',
+              data: { frequencyHz: restingFreq, gain: restingGain, waveform: 'sine' },
+            },
+          ];
+          const edges: RuntimeEdge[] = [
+            { id: 'a', source: connId, target: modId },
+            { id: 'b', source: modId, target: oscId },
+          ];
+          const withUsgs = resolveVoiceParams(nodes, edges, oscId, usgsSample);
+          const withNoaa = resolveVoiceParams(nodes, edges, oscId, noaaSample);
+          const resting = false;
+          expect(withNoaa.frequencyHz).toBe(restingFreq);
+          expect(withNoaa.modulated).toBe(resting);
+          expect(withUsgs.frequencyHz).toBe(
+            modulateFrequencyFromBase(usgsSample.mag, 1, 8, 0.5, 4, restingFreq),
+          );
         },
       ),
     );

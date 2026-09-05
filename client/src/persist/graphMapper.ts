@@ -10,7 +10,14 @@ export type DomainConnector = {
   feedUrl?: string;
   pollIntervalMs?: number;
   playbackHz?: number;
+  config?: unknown;
 };
+
+function readInterpolateFlag(config: unknown): boolean | undefined {
+  if (!config || typeof config !== 'object') return undefined;
+  const interpolate = (config as { interpolate?: unknown }).interpolate;
+  return typeof interpolate === 'boolean' ? interpolate : undefined;
+}
 
 export type DomainModulator = {
   id: string;
@@ -61,6 +68,8 @@ export function flowToDomainGraph(patchId: string, nodes: Node[], edges: Edge[])
   for (const node of nodes) {
     const data = node.data as Record<string, unknown>;
     if (node.type === 'connector') {
+      const interpolate =
+        typeof data.interpolate === 'boolean' ? data.interpolate : undefined;
       connectors.push({
         id: node.id,
         patchId,
@@ -71,6 +80,7 @@ export function flowToDomainGraph(patchId: string, nodes: Node[], edges: Edge[])
         feedUrl: typeof data.feedUrl === 'string' ? data.feedUrl : undefined,
         pollIntervalMs: typeof data.pollIntervalMs === 'number' ? data.pollIntervalMs : undefined,
         playbackHz: typeof data.playbackHz === 'number' ? data.playbackHz : undefined,
+        config: interpolate === undefined ? undefined : { interpolate },
       });
     } else if (node.type === 'modulator') {
       modulators.push({
@@ -125,6 +135,9 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
         feedUrl: row.feedUrl,
         pollIntervalMs: row.pollIntervalMs,
         playbackHz: row.playbackHz,
+        ...(readInterpolateFlag(row.config) === undefined
+          ? {}
+          : { interpolate: readInterpolateFlag(row.config) }),
       },
     })),
     ...graph.modulators.map((row) => ({

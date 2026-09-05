@@ -1,13 +1,17 @@
 import { mapChannelOrRest, mapRange } from './mapRange';
 import { findModulationChain, type RuntimeEdge, type RuntimeNode } from './modulationChain';
+import {
+  channelFromSample,
+  type ConnectorSample,
+  type UsgsConnectorSample,
+} from './channelFromSample';
 
-export type EarthquakeSample = {
-  id: string;
-  mag: number | null;
-  depthKm: number | null;
-  sig: number | null;
-  place: string;
-  time: number;
+export type { ConnectorSample, NoaaConnectorSample, UsgsConnectorSample } from './channelFromSample';
+export { channelFromSample } from './channelFromSample';
+
+/** Legacy USGS sample without kindKey; normalize to UsgsConnectorSample. */
+export type EarthquakeSample = Omit<UsgsConnectorSample, 'kindKey'> & {
+  kindKey?: 'usgs_earthquakes';
 };
 
 export type VoiceParams = {
@@ -17,13 +21,6 @@ export type VoiceParams = {
 };
 
 const MIN_AUDIBLE_HZ = 20;
-
-function channelFromSample(sample: EarthquakeSample, channelKey: string): number | null {
-  if (channelKey === 'mag') return sample.mag;
-  if (channelKey === 'depthKm') return sample.depthKm;
-  if (channelKey === 'sig') return sample.sig;
-  return null;
-}
 
 /**
  * Map a channel onto a ratio range, then multiply the Oscillator base frequency.
@@ -44,23 +41,54 @@ export function modulateFrequencyFromBase(
   return Math.max(MIN_AUDIBLE_HZ, baseFrequencyHz * ratio);
 }
 
+function normalizeSample(sample: ConnectorSample | EarthquakeSample | null): ConnectorSample | null {
+  if (!sample) return null;
+  if (sample.kindKey === 'noaa_coops_tides' || sample.kindKey === 'usgs_earthquakes') {
+    return sample as ConnectorSample;
+  }
+  return {
+    kindKey: 'usgs_earthquakes',
+    id: sample.id,
+    mag: sample.mag,
+    depthKm: sample.depthKm,
+    sig: sample.sig,
+    place: sample.place,
+    time: sample.time,
+  };
+}
+
 export function resolveVoiceParams(
   nodes: RuntimeNode[],
   edges: RuntimeEdge[],
   oscillatorId: string,
-  sample: EarthquakeSample | null,
+  sample: ConnectorSample | EarthquakeSample | null,
 ): VoiceParams {
   const chain = findModulationChain(nodes, edges, oscillatorId);
   const oscData = chain.oscillator.data;
   const restingFreq =
     typeof oscData.frequencyHz === 'number' ? oscData.frequencyHz : 220;
   const restingGain = typeof oscData.gain === 'number' ? oscData.gain : 0.2;
+  const resting = { frequencyHz: restingFreq, gain: restingGain, modulated: false };
 
   if (!chain.complete || !sample) {
-    return { frequencyHz: restingFreq, gain: restingGain, modulated: false };
+    return resting;
   }
 
-  const channelValue = channelFromSample(sample, chain.channelKey);
+  const normalized = normalizeSample(sample);
+  if (!normalized) return resting;
+
+  const connectorKind =
+    typeof chain.connector.data.kindKey === 'string' ? chain.connector.data.kindKey : '';
+  if (connectorKind.length === 0 || normalized.kindKey !== connectorKind) {
+    return resting;
+  }
+
+  const channelValue = channelFromSample(normalized, chain.channelKey, {
+    interpolate:
+      typeof chain.connector.data.interpolate === 'boolean'
+        ? chain.connector.data.interpolate
+        : true,
+  });
 
   if (chain.targetParam === 'gain') {
     const mappedGain = mapChannelOrRest(

@@ -26,7 +26,7 @@ Wire is a plain edge between two canvas nodes in a Patch. It stores source and t
 
 Canvas is the React Flow workspace where you place nodes and edges.
 
-Monitor is the output panel under the canvas. It shows frequency, level, and a waveform stub in the shell.
+Monitor is the output panel under the canvas. While Play is on, it shows one Channel strip per complete Connector to Modulator chain plus a live audio waveform from the mix.
 
 ## Verbs
 
@@ -46,7 +46,7 @@ Do not put mapping parameters on React Flow edges. Mapping belongs on a Modulato
 
 `usgs_earthquakes` is the first ConnectorKind. It uses the USGS all_day GeoJSON feed. Modulatable channels are `mag`, `depthKm`, and `sig`. Display channels include `place`, `time`, and `eventId`.
 
-`noaa_coops_tides` is the second ConnectorKind. It uses the NOAA CO-OPS Data Retrieval API with product `water_level`. The default station is `9414290` (San Francisco). Modulatable channel is `waterLevel`. Display channels include `time` and `stationId`. Live poll and sample stream are not wired yet.
+`noaa_coops_tides` is the second ConnectorKind. It uses the NOAA CO-OPS Data Retrieval API with product `water_level`. The default station is `9414290` (San Francisco). Modulatable channel is `waterLevel`. Display channels include `time` and `stationId`. The server polls about every six minutes and scrubs a recent window into a slow loop over SSE at `/api/tides/stream`.
 
 Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with Elementary as the audio runtime. Modulatable params are `frequencyHz` and `gain`.
 

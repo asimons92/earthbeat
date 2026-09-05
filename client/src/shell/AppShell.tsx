@@ -2,7 +2,6 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import {
-  oscillatorDefaults,
   shellAuthActions,
   shellCreateActions,
   shellNavItems,
@@ -11,6 +10,7 @@ import { decideAuthChrome } from '@/persist/sessionBootstrap';
 import { startGoogleSignIn, startSignOut } from '@/persist/authActions';
 import { ThemeToggle } from '@/theme/ThemeToggle';
 import { usePatchWorkspace } from '@/workspace/PatchWorkspace';
+import { OutputMonitor } from '@/shell/OutputMonitor';
 
 function persistLabel(status: string) {
   if (status === 'saving') return 'Saving…';
@@ -37,6 +37,12 @@ export function AppShell() {
     addOscillator,
     liveStatus,
     lastSample,
+    lastSamplesByKind,
+    monitorStrips,
+    sampleHistoryByStripId,
+    playStartedAtMs,
+    isPlaying,
+    getTimeDomainSnapshot,
     playAllOscillators,
     stopAllOscillators,
   } = usePatchWorkspace();
@@ -184,11 +190,11 @@ export function AppShell() {
             }
             title={
               liveStatus === 'live'
-                ? 'USGS stream connected'
+                ? 'Live connector streams connected'
                 : liveStatus === 'error'
-                  ? 'USGS stream error — retrying'
+                  ? 'Live stream error — retrying'
                   : liveStatus === 'connecting'
-                    ? 'Connecting to USGS stream'
+                    ? 'Connecting to live streams'
                     : 'Live feed idle'
             }
           >
@@ -217,28 +223,15 @@ export function AppShell() {
         <Outlet />
       </div>
 
-      <section className="shell__monitor" aria-label="Output monitor">
-        <div className="monitor__meta">
-          <div className="monitor__title">Output monitor</div>
-          <div className="monitor__readout">
-            <span>
-              {lastSample?.mag != null
-                ? `M ${lastSample.mag}`
-                : `${oscillatorDefaults.frequencyHz} Hz`}
-            </span>
-            <span>{lastSample?.place ?? 'Waiting for samples'}</span>
-          </div>
-        </div>
-        <svg className="monitor__wave" viewBox="0 0 800 80" preserveAspectRatio="none" aria-hidden>
-          <path
-            d="M0 40 C 50 10, 100 70, 150 40 S 250 10, 300 40 S 400 70, 450 40 S 550 10, 600 40 S 700 70, 800 40"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          />
-        </svg>
-        <div className="monitor__time">2.35 s</div>
-      </section>
+      <OutputMonitor
+        lastSample={lastSample}
+        lastSamplesByKind={lastSamplesByKind}
+        monitorStrips={monitorStrips}
+        sampleHistoryByStripId={sampleHistoryByStripId}
+        playStartedAtMs={playStartedAtMs}
+        isPlaying={isPlaying}
+        getTimeDomainSnapshot={getTimeDomainSnapshot}
+      />
 
       <footer className="shell__footer" aria-label="Patches">
         {patches.map((patch) => (

@@ -20,6 +20,12 @@ import {
   DEFAULT_SSE_MAX_CONNECTIONS,
 } from './sseConnectionGate.js';
 import { classifyRequestPath, resolveClientDistDir } from './staticSite.js';
+import { TideStream, type TideSample } from './tideStream.js';
+import {
+  DEFAULT_LOOP_SECONDS,
+  DEFAULT_PLAYBACK_HZ as TIDE_PLAYBACK_HZ,
+  DEFAULT_POLL_INTERVAL_MS as TIDE_POLL_INTERVAL_MS,
+} from './noaaCoops.js';
 import { DEFAULT_PLAYBACK_HZ, DEFAULT_POLL_INTERVAL_MS } from './usgs.js';
 
 const app = express();
@@ -75,8 +81,18 @@ const earthquakeStream = new EarthquakeStream({
   pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
 });
 
+const tideStream = new TideStream({
+  hz: TIDE_PLAYBACK_HZ,
+  pollIntervalMs: TIDE_POLL_INTERVAL_MS,
+  loopSeconds: DEFAULT_LOOP_SECONDS,
+});
+
 earthquakeStream.on('error', (error) => {
   console.error('Earthquake stream error:', error);
+});
+
+tideStream.on('error', (error) => {
+  console.error('Tide stream error:', error);
 });
 
 app.get('/api/earthquakes/stream', (req: Request, res: Response) => {
@@ -102,6 +118,29 @@ app.get('/api/earthquakes/stream', (req: Request, res: Response) => {
   });
 });
 
+app.get('/api/tides/stream', (req: Request, res: Response) => {
+  if (!sseGate.tryAcquire()) {
+    res.status(503).json({ error: 'Tide stream connection limit reached' });
+    return;
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const onSample = (sample: TideSample) => {
+    res.write(`data: ${JSON.stringify(sample)}\n\n`);
+  };
+
+  tideStream.on('sample', onSample);
+
+  req.on('close', () => {
+    tideStream.off('sample', onSample);
+    sseGate.release();
+  });
+});
+
 const clientDist = resolveClientDistDir(process.env, process.cwd());
 if (clientDist) {
   app.use(express.static(clientDist));
@@ -121,6 +160,7 @@ async function main() {
     await bootstrapLocalSession();
   }
   await earthquakeStream.start();
+  await tideStream.start();
   app.listen(port, () => {
     const site = clientDist ? ` static=${clientDist}` : '';
     console.log(`Earthbeat server on http://localhost:${port} (auth=${getAuthMode()}${site})`);

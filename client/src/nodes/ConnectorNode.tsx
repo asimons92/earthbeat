@@ -4,6 +4,7 @@ export type ConnectorNodeData = {
   label: string;
   kindKey: string;
   status: string;
+  interpolate?: boolean;
 };
 
 export type ConnectorFlowNode = Node<ConnectorNodeData, 'connector'>;

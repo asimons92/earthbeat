@@ -24,6 +24,23 @@ import {
   oscillatorDefaults,
   usgsConnector,
 } from '@/generated/catalog';
+
+const noaaConnector = connectorKindsByKey.noaa_coops_tides;
+const noaaWaterChannel =
+  noaaConnector.channels.find((channel) => channel.key === 'waterLevel') ??
+  noaaConnector.channels[0]!;
+const noaaInMin =
+  'mapHintMin' in noaaWaterChannel && typeof noaaWaterChannel.mapHintMin === 'number'
+    ? noaaWaterChannel.mapHintMin
+    : 'min' in noaaWaterChannel && typeof noaaWaterChannel.min === 'number'
+      ? noaaWaterChannel.min
+      : -1;
+const noaaInMax =
+  'mapHintMax' in noaaWaterChannel && typeof noaaWaterChannel.mapHintMax === 'number'
+    ? noaaWaterChannel.mapHintMax
+    : 'max' in noaaWaterChannel && typeof noaaWaterChannel.max === 'number'
+      ? noaaWaterChannel.max
+      : 3;
 import { usePatchPersist } from '@/persist/usePatchPersist';
 import { usePatchRuntime } from '@/runtime/usePatchRuntime';
 import { type ConnectorFlowNode } from '@/nodes/ConnectorNode';
@@ -34,7 +51,7 @@ const initialNodes: Node[] = [
   {
     id: 'connector-usgs',
     type: 'connector',
-    position: { x: 40, y: 140 },
+    position: { x: 40, y: 100 },
     data: {
       label: usgsConnector.label,
       kindKey: usgsConnector.key,
@@ -44,7 +61,7 @@ const initialNodes: Node[] = [
   {
     id: 'modulator-mag-freq',
     type: 'modulator',
-    position: { x: 280, y: 140 },
+    position: { x: 280, y: 100 },
     data: {
       label: 'Magnitude → Frequency',
       channelKey: modulatorDefaults.channelKey,
@@ -59,9 +76,47 @@ const initialNodes: Node[] = [
   {
     id: 'oscillator-sine',
     type: 'oscillator',
-    position: { x: 540, y: 140 },
+    position: { x: 540, y: 100 },
     data: {
       label: 'Sine Tone',
+      waveform: oscillatorDefaults.waveform,
+      frequencyHz: oscillatorDefaults.frequencyHz,
+      gain: oscillatorDefaults.gain,
+      status: `${oscillatorDefaults.frequencyHz} Hz`,
+    },
+  },
+  {
+    id: 'connector-noaa',
+    type: 'connector',
+    position: { x: 40, y: 280 },
+    data: {
+      label: noaaConnector.label,
+      kindKey: noaaConnector.key,
+      status: 'WL —',
+      interpolate: true,
+    },
+  },
+  {
+    id: 'modulator-tide-freq',
+    type: 'modulator',
+    position: { x: 280, y: 280 },
+    data: {
+      label: 'Water level → Frequency',
+      channelKey: noaaWaterChannel.key,
+      targetParam: modulatorDefaults.targetParam,
+      inMin: noaaInMin,
+      inMax: noaaInMax,
+      outMin: modulatorDefaults.outMin,
+      outMax: modulatorDefaults.outMax,
+      status: `${noaaInMin}–${noaaInMax} → ${modulatorDefaults.outMin}–${modulatorDefaults.outMax}`,
+    },
+  },
+  {
+    id: 'oscillator-tide',
+    type: 'oscillator',
+    position: { x: 540, y: 280 },
+    data: {
+      label: 'Tide Sine',
       waveform: oscillatorDefaults.waveform,
       frequencyHz: oscillatorDefaults.frequencyHz,
       gain: oscillatorDefaults.gain,
@@ -82,6 +137,20 @@ const initialEdges: Edge[] = [
     id: 'wire-modulator-oscillator',
     source: 'modulator-mag-freq',
     target: 'oscillator-sine',
+    sourceHandle: 'out',
+    targetHandle: 'in',
+  },
+  {
+    id: 'wire-noaa-modulator',
+    source: 'connector-noaa',
+    target: 'modulator-tide-freq',
+    sourceHandle: 'out',
+    targetHandle: 'in',
+  },
+  {
+    id: 'wire-tide-modulator-oscillator',
+    source: 'modulator-tide-freq',
+    target: 'oscillator-tide',
     sourceHandle: 'out',
     targetHandle: 'in',
   },
@@ -116,6 +185,12 @@ type PatchWorkspaceValue = {
   resolveConflictByReload: () => Promise<void>;
   liveStatus: ReturnType<typeof usePatchRuntime>['liveStatus'];
   lastSample: ReturnType<typeof usePatchRuntime>['lastSample'];
+  lastSamplesByKind: ReturnType<typeof usePatchRuntime>['lastSamplesByKind'];
+  monitorStrips: ReturnType<typeof usePatchRuntime>['monitorStrips'];
+  sampleHistoryByStripId: ReturnType<typeof usePatchRuntime>['sampleHistoryByStripId'];
+  playStartedAtMs: ReturnType<typeof usePatchRuntime>['playStartedAtMs'];
+  isPlaying: ReturnType<typeof usePatchRuntime>['isPlaying'];
+  getTimeDomainSnapshot: ReturnType<typeof usePatchRuntime>['getTimeDomainSnapshot'];
   playAllOscillators: () => void;
   stopAllOscillators: () => void;
 };
@@ -133,6 +208,12 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
   const {
     liveStatus,
     lastSample,
+    lastSamplesByKind,
+    monitorStrips,
+    sampleHistoryByStripId,
+    playStartedAtMs,
+    isPlaying,
+    getTimeDomainSnapshot,
     playOscillator,
     stopOscillator,
     playAllOscillators,
@@ -295,6 +376,12 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       resolveConflictByReload: persist.resolveConflictByReload,
       liveStatus,
       lastSample,
+      lastSamplesByKind,
+      monitorStrips,
+      sampleHistoryByStripId,
+      playStartedAtMs,
+      isPlaying,
+      getTimeDomainSnapshot,
       playAllOscillators,
       stopAllOscillators,
     }),
@@ -323,6 +410,12 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       persist.resolveConflictByReload,
       liveStatus,
       lastSample,
+      lastSamplesByKind,
+      monitorStrips,
+      sampleHistoryByStripId,
+      playStartedAtMs,
+      isPlaying,
+      getTimeDomainSnapshot,
       playAllOscillators,
       stopAllOscillators,
     ],

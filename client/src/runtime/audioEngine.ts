@@ -12,6 +12,8 @@ export type PatchAudioEngine = {
   setVoiceAudible: (oscillatorId: string, audible: boolean) => Promise<void>;
   removeVoice: (oscillatorId: string) => Promise<void>;
   listVoiceIds: () => string[];
+  /** Copy current time-domain analyser data into `out` (−1..1). Returns false if unavailable. */
+  getTimeDomainSnapshot: (out: Float32Array) => boolean;
   dispose: () => Promise<void>;
 };
 
@@ -35,7 +37,10 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     numberOfOutputs: 1,
     outputChannelCount: [2],
   });
-  node.connect(ctx.destination);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  node.connect(analyser);
+  analyser.connect(ctx.destination);
   await ctx.resume();
 
   const voices = new Map<string, VoiceState>();
@@ -126,8 +131,16 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     return [...voices.keys()];
   }
 
+  function getTimeDomainSnapshot(out: Float32Array): boolean {
+    if (ctx.state === 'closed') return false;
+    analyser.getFloatTimeDomainData(out as Float32Array<ArrayBuffer>);
+    return true;
+  }
+
   async function dispose() {
     voices.clear();
+    analyser.disconnect();
+    node.disconnect();
     await ctx.close();
   }
 
@@ -137,6 +150,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     setVoiceAudible,
     removeVoice,
     listVoiceIds,
+    getTimeDomainSnapshot,
     dispose,
   };
 }

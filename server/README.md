@@ -26,4 +26,4 @@ When `NODE_ENV=production`, the server refuses to start unless `AUTH_MODE=google
 
 ## API
 
-tRPC lives at `/api/trpc` (Clay-generated router). USGS SSE stays at `/api/earthquakes/stream`.
+tRPC lives at `/api/trpc` (Clay-generated router). USGS SSE is `/api/earthquakes/stream`. NOAA tides SSE is `/api/tides/stream`.

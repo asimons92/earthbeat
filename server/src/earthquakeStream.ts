@@ -9,6 +9,7 @@ import {
 } from './usgs.js';
 
 export type EarthquakeSample = {
+  kindKey: 'usgs_earthquakes';
   id: string;
   mag: number | null;
   depthKm: number | null;
@@ -25,6 +26,7 @@ export type EarthquakeStreamOptions = {
 function toSample(feature: UsgsEarthquakeFeature): EarthquakeSample {
   const depth = feature.geometry?.coordinates?.[2];
   return {
+    kindKey: 'usgs_earthquakes',
     id: feature.id,
     mag: feature.properties.mag,
     depthKm: typeof depth === 'number' ? depth : null,

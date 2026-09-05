@@ -235,8 +235,15 @@ export function NodeInspector({
   }
 
   if (selected.type === 'connector') {
-    const data = selected.data as { label: string; kindKey: string; status: string };
+    const data = selected.data as {
+      label: string;
+      kindKey: string;
+      status: string;
+      interpolate?: boolean;
+    };
     const kind = getConnectorKind(data.kindKey) ?? usgsConnector;
+    const isNoaa = data.kindKey === 'noaa_coops_tides';
+    const interpolate = data.interpolate !== false;
     return (
       <aside className="shell__inspector" aria-label="Node inspector">
         <div className="inspector__title">Connector</div>
@@ -245,6 +252,25 @@ export function NodeInspector({
           <Label>Connector kind</Label>
           <p className="inspector__readonly">{kind.label}</p>
         </div>
+        {isNoaa ? (
+          <div className="inspector__field">
+            <Label htmlFor="connector-interpolate">Smooth interpolate</Label>
+            <label className="inspector__check" htmlFor="connector-interpolate">
+              <input
+                id="connector-interpolate"
+                type="checkbox"
+                checked={interpolate}
+                onChange={(event) => {
+                  onChangeNodeData(selected.id, {
+                    ...data,
+                    interpolate: event.target.checked,
+                  });
+                }}
+              />
+              <span>Lerp between tide points while scrubbing</span>
+            </label>
+          </div>
+        ) : null}
         <div className="inspector__field">
           <Label>Modulatable channels</Label>
           <ul className="inspector__list">

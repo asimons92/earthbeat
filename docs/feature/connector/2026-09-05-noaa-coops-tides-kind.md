@@ -1,7 +1,7 @@
 # NOAA CO-OPS tides ConnectorKind
 
 Date: 2026-09-05
-Status: decided
+Status: superseded
 
 ## Context
 
@@ -17,4 +17,4 @@ CO-OPS water level matches the existing Tides palette category and gives a clear
 
 ## Follow-up
 
-Add a server poller and sample stream for CO-OPS, then wire Elementary like USGS. Station picker UI stays out of scope until the poller exists. Related shell nav: `../shell/2026-09-05-nav-items-and-libraries.md`.
+Live poll and scrub are wired. See `2026-09-05-noaa-tides-live-wire.md` and `../runtime/2026-09-05-noaa-tide-scrub-stream.md`. Station picker UI stays out of scope until needed. Related shell nav: `../shell/2026-09-05-nav-items-and-libraries.md`.

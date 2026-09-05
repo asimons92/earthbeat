@@ -148,7 +148,7 @@
         {
           "key": "noaa_coops_tides",
           "label": "NOAA Tides",
-          "description": "NOAA CO-OPS water_level product (preliminary or verified 6-minute interval). Default station is San Francisco (9414290). Live poll is a follow-up.",
+          "description": "NOAA CO-OPS water_level product (preliminary or verified 6-minute interval). Default station is San Francisco (9414290). Server polls about every six minutes and scrubs a 24h window into a slow ~120s loop.",
           "feedUrl": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter",
           "defaultPollIntervalMs": 360000,
           "defaultPlaybackHz": 1,
@@ -159,7 +159,8 @@
             "units": "metric",
             "time_zone": "gmt",
             "format": "json",
-            "application": "earthbeat"
+            "application": "earthbeat",
+            "interpolate": true
           },
           "channels": [
             {

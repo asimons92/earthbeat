@@ -8,6 +8,7 @@ export type ConnectorNodeDraft = {
     label: string;
     kindKey: string;
     status: string;
+    interpolate?: boolean;
   };
 };
 
@@ -15,7 +16,9 @@ export type ConnectorNodeDraft = {
  * Build a canvas Connector node from a catalog kind key.
  * Returns undefined when the kind is not in the catalog (never invents kindKey).
  */
-export function buildConnectorNode<T extends ConnectorKindLike>(args: {
+export function buildConnectorNode<T extends ConnectorKindLike & {
+  defaultConfig?: { interpolate?: boolean };
+}>(args: {
   kindKey: string;
   kindsByKey: Readonly<Record<string, T>>;
   existingConnectorCount: number;
@@ -31,6 +34,11 @@ export function buildConnectorNode<T extends ConnectorKindLike>(args: {
       ? kind.label
       : `${kind.label} ${args.existingConnectorCount + 1}`;
 
+  const interpolate =
+    kind.defaultConfig && typeof kind.defaultConfig.interpolate === 'boolean'
+      ? kind.defaultConfig.interpolate
+      : undefined;
+
   return {
     id: args.newId,
     type: 'connector',
@@ -39,6 +47,7 @@ export function buildConnectorNode<T extends ConnectorKindLike>(args: {
       label,
       kindKey: kind.key,
       status: args.status ?? 'M —',
+      ...(interpolate === undefined ? {} : { interpolate }),
     },
   };
 }
