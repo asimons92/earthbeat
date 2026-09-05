@@ -1,7 +1,8 @@
 {
   "name": "earthbeat",
   "generators": [
-    "./generators/ui-catalog"
+    "./generators/ui-catalog",
+    "./generators/api"
   ],
   "model": {
     "catalog": {
@@ -262,6 +263,13 @@
             "name": "updatedAt",
             "type": "timestamp",
             "required": true
+          },
+          {
+            "name": "version",
+            "type": "number",
+            "required": true,
+            "default": 1,
+            "description": "Optimistic concurrency token. Every write checks and bumps this value."
           }
         ],
         "commands": [
@@ -287,6 +295,11 @@
                 "name": "name",
                 "type": "string",
                 "required": true
+              },
+              {
+                "name": "expectedVersion",
+                "type": "number",
+                "required": true
               }
             ]
           },
@@ -297,6 +310,64 @@
                 "name": "id",
                 "type": "string",
                 "required": true
+              },
+              {
+                "name": "expectedVersion",
+                "type": "number",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "list",
+            "parameters": []
+          },
+          {
+            "name": "get",
+            "parameters": [
+              {
+                "name": "id",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "replaceGraph",
+            "parameters": [
+              {
+                "name": "id",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "expectedVersion",
+                "type": "number",
+                "required": true
+              },
+              {
+                "name": "connectors",
+                "type": "json",
+                "required": true,
+                "description": "Full Connector rows for this Patch."
+              },
+              {
+                "name": "modulators",
+                "type": "json",
+                "required": true,
+                "description": "Full Modulator rows for this Patch."
+              },
+              {
+                "name": "oscillators",
+                "type": "json",
+                "required": true,
+                "description": "Full Oscillator rows for this Patch."
+              },
+              {
+                "name": "wires",
+                "type": "json",
+                "required": true,
+                "description": "Full Wire rows for this Patch."
               }
             ]
           }
@@ -304,6 +375,7 @@
       },
       {
         "name": "ConnectorKind",
+        "persist": false,
         "description": "Catalog entry for a natural-signal API kind. usgs_earthquakes channels mirror USGS GeoJSON summary fields used for sonification and display.",
         "fields": [
           {
@@ -860,6 +932,82 @@
               },
               {
                 "name": "label",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "remove",
+            "parameters": [
+              {
+                "name": "id",
+                "type": "string",
+                "required": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Wire",
+        "description": "Plain React Flow edge between two canvas nodes. Stores no mapping data.",
+        "persist": true,
+        "fields": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "patchId",
+            "type": "string",
+            "required": true,
+            "ref": "Patch"
+          },
+          {
+            "name": "sourceNodeId",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "targetNodeId",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "sourceHandle",
+            "type": "string"
+          },
+          {
+            "name": "targetHandle",
+            "type": "string"
+          }
+        ],
+        "commands": [
+          {
+            "name": "add",
+            "parameters": [
+              {
+                "name": "patchId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "sourceNodeId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "targetNodeId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "sourceHandle",
+                "type": "string"
+              },
+              {
+                "name": "targetHandle",
                 "type": "string"
               }
             ]

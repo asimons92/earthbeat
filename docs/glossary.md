@@ -14,9 +14,11 @@ ConnectorKind is a catalog entry for a natural-signal API kind. Example: `usgs_e
 
 Channel is one numeric output of a ConnectorKind. Example: `mag` (magnitude) on USGS Quakes, with a useful min and max range.
 
-Modulator is a canvas node that maps a Channel onto an Oscillator parameter. Example: `mag` to frequency, 1 to 8 maps to 110 Hz to 880 Hz. React Flow edges between nodes are plain wires. They do not store mapping data.
+Modulator is a canvas node that maps a Channel onto an Oscillator parameter. Example: `mag` to frequency with ratios of the Oscillator base. React Flow edges between nodes are plain Wires. They do not store mapping data.
 
 Oscillator is a canvas node that makes sound. The catalog default waveform is sine.
+
+Wire is a plain edge between two canvas nodes in a Patch. It stores source and target node ids and optional handles. It does not store mapping data.
 
 Canvas is the React Flow workspace where you place nodes and edges.
 
@@ -26,9 +28,9 @@ Monitor is the output panel under the canvas. It shows frequency, level, and a w
 
 upsertFromAuth creates or updates a User from a provider profile.
 
-create, rename, and delete act on a Patch.
+create, rename, delete, list, get, and replaceGraph act on a Patch. replaceGraph saves the full node and Wire set in one transaction and bumps Patch.version.
 
-add, move, updateConfig or updateParams or updateMapping, and remove act on Connector, Modulator, and Oscillator nodes.
+add, move, updateConfig or updateParams or updateMapping, and remove act on Connector, Modulator, Oscillator, and Wire nodes.
 
 ## Name clashes
 

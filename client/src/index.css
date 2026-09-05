@@ -95,6 +95,18 @@ select {
   gap: 0.5rem;
 }
 
+.shell__persist-status {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.shell__persist-status[data-status='conflict'],
+.shell__persist-status[data-status='error'] {
+  opacity: 1;
+  color: var(--ink-muted);
+}
+
 .transport-btn {
   width: 2rem;
   height: 2rem;

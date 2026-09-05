@@ -8,13 +8,13 @@ The first ConnectorKind (catalog entry for a natural-signal API) is `usgs_earthq
 
 ## Status
 
-M2 is in place: an Express `server/` polls the USGS all_day feed and streams samples over SSE. The client maps a wired Connector through a Modulator into sine Oscillators and plays them with Elementary.
+M3 is in place: Clay-generated tRPC + Drizzle persist Patches in Postgres. Local auth seeds a development user. Google OAuth via Auth.js is available when AUTH_MODE=google. M2 USGS SSE and Elementary playback remain.
 
-Auth and Postgres patch persistence are still ahead (M3). See `docs/PRD.md` for milestones and `docs/feature/runtime/` for M2 decisions.
+See `docs/PRD.md` for milestones and `docs/feature/persist/` for M3 decisions.
 
 ## Requirements
 
-You need Node.js 20 or newer and pnpm.
+You need Node.js 20 or newer, pnpm, and Docker (for Postgres).
 
 ## Setup
 
@@ -25,6 +25,14 @@ You need Node.js 20 or newer and pnpm.
 pnpm install
 ```
 
+3. Start Postgres and create tables:
+
+```bash
+docker compose up -d
+pnpm --dir server migrate
+```
+
+Copy `.env.example` to `.env` when you need to change database or auth values.
 ## Run the app
 
 From the repository root:
@@ -59,7 +67,7 @@ pnpm build
 
 | Path | Role |
 | --- | --- |
-| `client/` | Vite React TypeScript app and canvas UI |
+| `server/` | Express USGS SSE, Auth.js, Clay-generated tRPC persist |
 | `clay/` | Domain model and Clay generators |
 | `docs/` | PRD, glossary, UI conventions, feature journals |
 | `AGENTS.md` | Rules for agents that change product code |
@@ -73,7 +81,7 @@ Dropdowns and palette labels come from the generated catalog at `client/src/gene
 | Doc | Content |
 | --- | --- |
 | `docs/PRD.md` | Product vision, MVP scope, milestones |
-| `docs/glossary.md` | Shared nouns and verbs (Patch, Connector, Modulator, Oscillator) |
+| `docs/glossary.md` | Shared nouns and verbs (Patch, Connector, Modulator, Oscillator, Wire) |
 | `docs/ui-conventions.md` | Eggshell shell tokens and UI rules |
 | `docs/feature/README.md` | Feature journal convention |
 | `docs/earthbeat-ui-eggshell-minimal.png` | Primary shell layout reference |

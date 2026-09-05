@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -21,9 +21,9 @@ import {
   oscillatorDefaults,
   shellCreateActions,
   shellPaletteCategories,
-  shellPatchTabs,
   usgsConnector,
 } from '@/generated/catalog';
+import { usePatchPersist } from '@/persist/usePatchPersist';
 import { usePatchRuntime } from '@/runtime/usePatchRuntime';
 import { ConnectorNode, type ConnectorFlowNode } from './nodes/ConnectorNode';
 import { ModulatorNode, type ModulatorFlowNode } from './nodes/ModulatorNode';
@@ -51,7 +51,7 @@ const initialNodes: Node[] = [
     type: 'modulator',
     position: { x: 280, y: 140 },
     data: {
-      label: 'Magnitude → Frequency (Hz)',
+      label: 'Magnitude → Frequency',
       channelKey: modulatorDefaults.channelKey,
       targetParam: modulatorDefaults.targetParam,
       inMin: modulatorDefaults.inMin,
@@ -96,14 +96,31 @@ function nextOffset(count: number) {
   return { x: 60 + (count % 5) * 36, y: 60 + (count % 5) * 36 };
 }
 
+function persistLabel(status: string) {
+  if (status === 'saving') return 'Saving…';
+  if (status === 'saved') return 'Saved';
+  if (status === 'conflict') return 'Version conflict';
+  if (status === 'error') return 'Save failed';
+  return 'Not saved';
+}
+
 export default function App() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChangeBase] = useEdgesState(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const activePatch = useMemo(
-    () => shellPatchTabs.find((tab) => tab.active)?.name ?? 'Untitled Patch',
-    [],
-  );
+
+  const {
+    sessionReady,
+    patches,
+    activePatchId,
+    activePatchName,
+    persistStatus,
+    saveNow,
+    scheduleAutosave,
+    createPatch,
+    loadPatch,
+    resolveConflictByReload,
+  } = usePatchPersist({ nodes, edges, setNodes, setEdges });
 
   const {
     liveStatus,
@@ -114,6 +131,24 @@ export default function App() {
     stopAllOscillators,
     isOscillatorPlaying,
   } = usePatchRuntime(nodes, edges);
+
+  useEffect(() => {
+    scheduleAutosave();
+  }, [nodes, edges, scheduleAutosave]);
+
+  const onNodesChange = useCallback(
+    (changes: Parameters<typeof onNodesChangeBase>[0]) => {
+      onNodesChangeBase(changes);
+    },
+    [onNodesChangeBase],
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: Parameters<typeof onEdgesChangeBase>[0]) => {
+      onEdgesChangeBase(changes);
+    },
+    [onEdgesChangeBase],
+  );
 
   const onToggleOscillatorPlay = useCallback(
     (nodeId: string) => {
@@ -191,7 +226,7 @@ export default function App() {
         type: 'modulator',
         position,
         data: {
-          label: index === 0 ? 'Magnitude → Frequency (Hz)' : `Modulator ${index + 1}`,
+          label: index === 0 ? 'Magnitude → Frequency' : `Modulator ${index + 1}`,
           channelKey: modulatorDefaults.channelKey,
           targetParam: modulatorDefaults.targetParam,
           inMin: modulatorDefaults.inMin,
@@ -223,6 +258,27 @@ export default function App() {
     });
   }, [setNodes]);
 
+  const onSaveClick = useCallback(async () => {
+    if (!sessionReady) {
+      window.alert('Sign in to save a Patch.');
+      return;
+    }
+    if (!activePatchId) {
+      const name = window.prompt('Patch name', activePatchName) ?? activePatchName;
+      await createPatch(name.trim() || 'Untitled Patch');
+      return;
+    }
+    await saveNow();
+  }, [activePatchId, activePatchName, createPatch, saveNow, sessionReady]);
+
+  const onSelectPatch = useCallback(
+    async (patchId: string) => {
+      if (!patchId) return;
+      await loadPatch(patchId);
+    },
+    [loadPatch],
+  );
+
   return (
     <div className="shell">
       <header className="shell__header">
@@ -250,15 +306,33 @@ export default function App() {
         </div>
         <label className="shell__patch-select">
           <span className="visually-hidden">Active patch</span>
-          <select defaultValue={activePatch} aria-label="Active patch">
-            {shellPatchTabs.map((tab) => (
-              <option key={tab.key} value={tab.name}>
-                {tab.name}
+          <select
+            value={activePatchId ?? ''}
+            aria-label="Active patch"
+            onChange={(event) => {
+              void onSelectPatch(event.target.value);
+            }}
+          >
+            <option value="">{activePatchName}</option>
+            {patches.map((patch) => (
+              <option key={patch.id} value={patch.id}>
+                {patch.name}
               </option>
             ))}
           </select>
         </label>
         <div className="shell__transport">
+          <Button type="button" variant="outline" size="sm" onClick={() => void onSaveClick()}>
+            Save
+          </Button>
+          <span className="shell__persist-status" data-status={persistStatus}>
+            {persistLabel(persistStatus)}
+          </span>
+          {persistStatus === 'conflict' ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => void resolveConflictByReload()}>
+              Reload
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -370,20 +444,34 @@ export default function App() {
       </section>
 
       <footer className="shell__footer" aria-label="Patches">
-        {shellPatchTabs.map((tab) => (
+        {patches.map((patch) => (
           <button
-            key={tab.key}
+            key={patch.id}
             type="button"
-            className={tab.active ? 'patch-tab patch-tab--active' : 'patch-tab'}
+            className={
+              patch.id === activePatchId ? 'patch-tab patch-tab--active' : 'patch-tab'
+            }
+            onClick={() => {
+              void loadPatch(patch.id);
+            }}
           >
-            {tab.name}
+            {patch.name}
           </button>
         ))}
-        {Array.from({ length: 4 }, (_, index) => (
-          <button key={`new-${index}`} type="button" className="patch-tab patch-tab--new" aria-label="New patch">
-            +
-          </button>
-        ))}
+        <button
+          type="button"
+          className="patch-tab patch-tab--new"
+          aria-label="New patch"
+          onClick={() => {
+            if (!sessionReady) {
+              window.alert('Sign in to save a Patch.');
+              return;
+            }
+            void createPatch(`Patch ${patches.length + 1}`);
+          }}
+        >
+          +
+        </button>
       </footer>
     </div>
   );

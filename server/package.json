@@ -6,17 +6,29 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "migrate": "tsx src/migrate-cli.ts",
+    "test": "vitest run",
+    "test:db": "RUN_DB_TESTS=1 vitest run src/persist.handlers.test.ts"
   },
   "dependencies": {
+    "@auth/express": "^0.12.3",
+    "@trpc/server": "^11.1.0",
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.44.0",
+    "express": "^5.1.0",
+    "pg": "^8.16.0",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "@types/node": "^24.13.3",
+    "@types/pg": "^8.15.0",
+    "fast-check": "^4.9.0",
     "tsx": "^4.19.3",
-    "typescript": "~6.0.2"
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.0"
   }
 }

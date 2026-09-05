@@ -3,9 +3,28 @@
   "formatters": [],
   "steps": [
     {
-      "generate": "templates/{{name}}.model.ts",
-      "select": "$.model.types[*]",
-      "target": "src/models/"
+      "generate": "templates/types.ts",
+      "select": "$.model",
+      "target": "server/src/generated/",
+      "engine": "ejs"
+    },
+    {
+      "generate": "templates/schema.ts",
+      "select": "$.model",
+      "target": "server/src/generated/",
+      "engine": "ejs"
+    },
+    {
+      "generate": "templates/handlers.ts",
+      "select": "$.model",
+      "target": "server/src/generated/",
+      "engine": "ejs"
+    },
+    {
+      "generate": "templates/router.ts",
+      "select": "$.model",
+      "target": "server/src/generated/",
+      "engine": "ejs"
     }
   ]
 }

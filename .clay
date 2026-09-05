@@ -9,10 +9,26 @@
         "client/src/generated/catalog.ts": {
           "md5": "714b3c38bd6664149096988fb6f68b7b",
           "date": "2026-09-05T05:33:00.662Z"
+        },
+        "server/src/generated/types.ts": {
+          "md5": "ee8cba68983ea777221f6778c8609272",
+          "date": "2026-09-05T05:48:09.897Z"
+        },
+        "server/src/generated/schema.ts": {
+          "md5": "a33f47b68df7424d42c1a7c9f16631ac",
+          "date": "2026-09-05T05:53:48.394Z"
+        },
+        "server/src/generated/handlers.ts": {
+          "md5": "5da6d64b5d44d1efe68d8d3fd85d85b3",
+          "date": "2026-09-05T05:48:09.902Z"
+        },
+        "server/src/generated/router.ts": {
+          "md5": "2aad1b0784d80f8e11b3a197c4073663",
+          "date": "2026-09-05T05:48:09.903Z"
         }
       },
-      "last_generated": "2026-09-05T05:33:00.662Z",
-      "input_hash": "384047309bdd0376676f98e41dbe7fa7"
+      "last_generated": "2026-09-05T05:53:48.394Z",
+      "input_hash": "134e783d6d594e70bbc23e599cfa5fa1"
     }
   ]
 }
