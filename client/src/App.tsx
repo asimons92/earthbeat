@@ -1,18 +1,21 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   Background,
   BackgroundVariant,
   ReactFlow,
-  type EdgeTypes,
+  useEdgesState,
+  useNodesState,
+  type Edge,
+  type Node,
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { Button } from '@/components/ui/button';
-import { demoModulation, oscillatorDefaults, usgsConnector } from './catalog';
-import { ModulationEdge } from './edges/ModulationEdge';
-import { ConnectionNode } from './nodes/ConnectionNode';
-import { OscillatorNode } from './nodes/OscillatorNode';
+import { modulatorDefaults, oscillatorDefaults, usgsConnector } from './catalog';
+import { ConnectorNode, type ConnectorFlowNode } from './nodes/ConnectorNode';
+import { ModulatorNode, type ModulatorFlowNode } from './nodes/ModulatorNode';
+import { OscillatorNode, type OscillatorFlowNode } from './nodes/OscillatorNode';
 
 const SIDEBAR_ITEMS = [
   { id: 'seismic', label: 'Seismic', icon: '∿' },
@@ -31,29 +34,37 @@ const PATCH_TABS = [
 ] as const;
 
 const nodeTypes = {
-  connection: ConnectionNode,
+  connector: ConnectorNode,
+  modulator: ModulatorNode,
   oscillator: OscillatorNode,
 } satisfies NodeTypes;
 
-const edgeTypes = {
-  modulation: ModulationEdge,
-} satisfies EdgeTypes;
-
-const initialNodes = [
+const initialNodes: Node[] = [
   {
-    id: 'connection-usgs',
-    type: 'connection' as const,
-    position: { x: 80, y: 140 },
+    id: 'connector-usgs',
+    type: 'connector',
+    position: { x: 40, y: 140 },
     data: {
       label: usgsConnector.label,
-      connectorKey: usgsConnector.key,
+      kindKey: usgsConnector.key,
       status: 'M —',
     },
   },
   {
+    id: 'modulator-mag-freq',
+    type: 'modulator',
+    position: { x: 280, y: 140 },
+    data: {
+      label: 'Magnitude → Hz',
+      channelKey: modulatorDefaults.channelKey,
+      targetParam: modulatorDefaults.targetParam,
+      status: `${modulatorDefaults.inMin}–${modulatorDefaults.inMax} → ${modulatorDefaults.outMin}–${modulatorDefaults.outMax}`,
+    },
+  },
+  {
     id: 'oscillator-sine',
-    type: 'oscillator' as const,
-    position: { x: 460, y: 140 },
+    type: 'oscillator',
+    position: { x: 540, y: 140 },
     data: {
       label: 'Sine Tone',
       waveform: oscillatorDefaults.waveform,
@@ -62,27 +73,34 @@ const initialNodes = [
   },
 ];
 
-const initialEdges = [
+const initialEdges: Edge[] = [
   {
-    id: 'modulation-mag-freq',
-    type: 'modulation' as const,
-    source: 'connection-usgs',
+    id: 'wire-connector-modulator',
+    source: 'connector-usgs',
+    target: 'modulator-mag-freq',
+    sourceHandle: 'out',
+    targetHandle: 'in',
+  },
+  {
+    id: 'wire-modulator-oscillator',
+    source: 'modulator-mag-freq',
     target: 'oscillator-sine',
     sourceHandle: 'out',
     targetHandle: 'in',
-    data: {
-      label: `${demoModulation.channelKey} → ${demoModulation.targetParam}`,
-    },
   },
 ];
+
+function nextOffset(count: number) {
+  return { x: 60 + (count % 5) * 36, y: 60 + (count % 5) * 36 };
+}
 
 function noopTransport() {
   // Shell stub: live audio and USGS streaming come later.
 }
 
 export default function App() {
-  const [nodes] = useState(initialNodes);
-  const [edges] = useState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
   const activePatch = useMemo(
     () => PATCH_TABS.find((tab) => tab.active)?.name ?? 'Untitled Patch',
     [],
@@ -91,10 +109,76 @@ export default function App() {
   const onPlay = useCallback(() => noopTransport(), []);
   const onStop = useCallback(() => noopTransport(), []);
 
+  const addOscillator = useCallback(() => {
+    setNodes((current) => {
+      const index = current.filter((node) => node.type === 'oscillator').length;
+      const position = nextOffset(current.length);
+      const node: OscillatorFlowNode = {
+        id: `oscillator-${crypto.randomUUID()}`,
+        type: 'oscillator',
+        position,
+        data: {
+          label: index === 0 ? 'Sine Tone' : `Sine Tone ${index + 1}`,
+          waveform: oscillatorDefaults.waveform,
+          status: `${oscillatorDefaults.baseFrequencyHz} Hz`,
+        },
+      };
+      return [...current, node];
+    });
+  }, [setNodes]);
+
+  const addModulator = useCallback(() => {
+    setNodes((current) => {
+      const index = current.filter((node) => node.type === 'modulator').length;
+      const position = nextOffset(current.length);
+      const node: ModulatorFlowNode = {
+        id: `modulator-${crypto.randomUUID()}`,
+        type: 'modulator',
+        position,
+        data: {
+          label: index === 0 ? 'Magnitude → Hz' : `Magnitude → Hz ${index + 1}`,
+          channelKey: modulatorDefaults.channelKey,
+          targetParam: modulatorDefaults.targetParam,
+          status: `${modulatorDefaults.inMin}–${modulatorDefaults.inMax} → ${modulatorDefaults.outMin}–${modulatorDefaults.outMax}`,
+        },
+      };
+      return [...current, node];
+    });
+  }, [setNodes]);
+
+  const addConnector = useCallback(() => {
+    setNodes((current) => {
+      const index = current.filter((node) => node.type === 'connector').length;
+      const position = nextOffset(current.length);
+      const node: ConnectorFlowNode = {
+        id: `connector-${crypto.randomUUID()}`,
+        type: 'connector',
+        position,
+        data: {
+          label: index === 0 ? usgsConnector.label : `${usgsConnector.label} ${index + 1}`,
+          kindKey: usgsConnector.key,
+          status: 'M —',
+        },
+      };
+      return [...current, node];
+    });
+  }, [setNodes]);
+
   return (
     <div className="shell">
       <header className="shell__header">
         <div className="shell__brand">EARTHBEAT</div>
+        <div className="shell__create">
+          <Button type="button" variant="outline" size="sm" onClick={addConnector}>
+            New connector
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={addModulator}>
+            New modulator
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={addOscillator}>
+            New oscillator
+          </Button>
+        </div>
         <label className="shell__patch-select">
           <span className="visually-hidden">Active patch</span>
           <select defaultValue={activePatch} aria-label="Active patch">
@@ -135,12 +219,13 @@ export default function App() {
           <ReactFlow
             nodes={nodes}
             edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
             fitView
             proOptions={{ hideAttribution: true }}
             nodesDraggable
-            nodesConnectable={false}
+            nodesConnectable
             elementsSelectable
           >
             <Background

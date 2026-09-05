@@ -20,7 +20,7 @@ Natural data is abundant and often free to access, but experiencing it is usuall
 
 Earthbeat is a **browser-based modular sonification environment**:
 
-1. **Connections** pull or stream natural signals from external APIs
+1. **Connectors** pull or stream natural signals from external APIs
 2. Users arrange **nodes** on a **React Flow** canvas and connect them into patches
 3. Patches drive **sound generators** (and related transforms) in real time
 4. Signed-in users can **save, reload, and iterate** on patches
@@ -31,8 +31,8 @@ The canvas is the primary creative surface—closer to a modular synth or node e
 
 ### Primary
 
-- Let a user build a working patch: at least one natural **Connection** → optional **Modulation** → at least one **sound** output
-- Support **multiple Connector kinds** over time (not a single hard-coded API)
+- Let a user build a working patch: at least one natural **Connector** → optional **Modulator** → at least one **sound** output
+- Support **multiple ConnectorKinds** over time (not a single hard-coded API)
 - Persist user work (patches) behind authentication
 - Keep the domain model explicit and regenerable (Clay / model-driven development)
 
@@ -56,15 +56,15 @@ The canvas is the primary creative surface—closer to a modular synth or node e
 | Explorer | Hear the planet / nature as sound with minimal setup |
 | Sound designer / musician | Map real signals into patches they can tweak and save |
 | Educator / demonstrator | Show live data → sound cause-and-effect on a clear graph |
-| Builder (future) | Add or configure new Connectors without forking the whole app |
+| Builder (future) | Add or configure new ConnectorKinds without forking the whole app |
 
 **Assumption:** first useful product slice targets a single signed-in user building and saving their own patches (not multiplayer editing).
 
 ## 6. Core concepts
 
-### 6.1 Connector and Connection
+### 6.1 ConnectorKind and Connector
 
-A Connector is a catalog entry for an external natural-signal API (or a normalized feed derived from one).
+A ConnectorKind is a catalog entry for an external natural-signal API (or a normalized feed derived from one).
 
 Examples (illustrative, not a committed catalog):
 
@@ -74,11 +74,11 @@ Examples (illustrative, not a committed catalog):
 - Tides / water level
 - Air quality
 
-A Connection is a Connector instance on the canvas. The feed exposes a **stream or poll of samples** with a documented shape (timestamp, numeric channels, metadata such as place/id).
+A Connector is a canvas node: one instance of a ConnectorKind inside a Patch. The feed exposes a **stream or poll of samples** with a documented shape (timestamp, numeric channels, metadata such as place/id).
 
-### 6.2 Modulation (mapping on the edge)
+### 6.2 Modulator
 
-A Modulation is the graph edge from a Connection to an Oscillator. It holds the mapping (for example mag to frequency). Separate transform nodes can come later.
+A Modulator is a canvas node that maps a Channel onto an Oscillator parameter (for example mag to frequency). React Flow edges between nodes are plain wires.
 
 ### 6.3 Oscillator
 
@@ -96,7 +96,7 @@ Authenticated identity that owns saved patches (and later preferences). Auth imp
 
 ### Primary surface: React Flow canvas
 
-- Drag nodes from a palette (Connections, transforms, sound)
+- Drag nodes from a palette (Connectors, transforms, sound)
 - Connect outputs → inputs with typed or documented edge rules
 - Inspect live values on nodes while a patch is running
 - Start/stop audio (browser autoplay constraints apply)
@@ -106,11 +106,11 @@ Authenticated identity that owns saved patches (and later preferences). Auth imp
 - Sign in / sign out
 - Save / rename / open / delete patches
 - Basic validation when connections or required config are invalid
-- Clear empty state: e.g. “Add a Connection and a sound node to begin”
+- Clear empty state: e.g. “Add a Connector and a sound node to begin”
 
 ### Out of canvas (later)
 
-- Connector catalog documentation
+- ConnectorKind catalog documentation
 - Sharing and discovery
 
 ## 8. Functional requirements
@@ -118,12 +118,12 @@ Authenticated identity that owns saved patches (and later preferences). Auth imp
 ### Must have (MVP direction)
 
 1. **Canvas editor** using React Flow to create/edit a patch graph
-2. **At least two distinct source types** *or* one real Connector plus a clear extension path—product intent is multi-source; MVP may ship one live Connector plus stubs/fixtures if needed
+2. **At least two distinct source types** *or* one real ConnectorKind plus a clear extension path—product intent is multi-source; MVP may ship one live ConnectorKind plus stubs/fixtures if needed
 3. **At least one sound generator** driven by patch signals
 4. **Live runtime** that executes the graph (poll/stream → transforms → audio)
 5. **Auth** so a user can sign in (Google OAuth is acceptable/desired)
 6. **Persistence** of patches owned by a user (create, read, update, delete)
-7. **Domain model** for User, Patch/graph structure, and Connector kinds suitable for Clay-driven generation of types/API surfaces
+7. **Domain model** for User, Patch/graph structure, and ConnectorKinds suitable for Clay-driven generation of types/API surfaces
 
 ### Should have
 
@@ -158,7 +158,7 @@ Agreed leaning for implementation (detail belongs in architecture docs / Clay ge
 
 **Decision:** every domain mutation (Clay command / tRPC mutation that writes) runs in a **single database transaction**.
 
-**Why (even without multiplayer canvas):** one user can still race themselves via autosave, multi-tab, or retries. Graph edits often touch multiple rows (e.g. remove a Connection and its Modulations). Transactions give atomicity; overlapping saves should additionally use a cheap optimistic check (`patch.version` or `updatedAt`) so last-write-wins is explicit rather than silent corruption. True co-editing (CRDT/OT) is out of scope until needed.
+**Why (even without multiplayer canvas):** one user can still race themselves via autosave, multi-tab, or retries. Graph edits often touch multiple rows (e.g. remove a Connector or Modulator and dependent wires). Transactions give atomicity; overlapping saves should additionally use a cheap optimistic check (`patch.version` or `updatedAt`) so last-write-wins is explicit rather than silent corruption. True co-editing (CRDT/OT) is out of scope until needed.
 
 **How we will enforce it (not yet implemented):**
 
@@ -176,7 +176,7 @@ MVP is successful when:
 
 1. A signed-in user can build a patch on the canvas that produces sound from a natural data source
 2. They can save that patch, refresh the browser, and restore it
-3. Adding a second Connector kind is mostly a matter of registering a new Connector module + model entry—not rewriting the app
+3. Adding a second Connector kind is mostly a matter of registering a new ConnectorKind module + model entry—not rewriting the app
 4. Generated vs hand-written boundaries are respected (agents/tools do not hand-edit Clay outputs)
 
 ## 11. Milestones (suggested)
@@ -185,9 +185,9 @@ MVP is successful when:
 | --- | --- |
 | M0 — Model & docs | PRD + Clay domain sketch (User, Patch, Connector, core mutations) |
 | M1 — Shell | Vite app + React Flow empty canvas + auth stub/real OAuth |
-| M2 — Runtime | Execute a minimal graph end-to-end (one Connection → one Oscillator) |
+| M2 — Runtime | Execute a minimal graph end-to-end (one Connector → one Modulator → one Oscillator) |
 | M3 — Persist | Save/load patches for authenticated users |
-| M4 — Multi-source | Second real Connector + clearer source plugin/model pattern |
+| M4 — Multi-source | Second real ConnectorKind + clearer source plugin/model pattern |
 
 ## 12. Open questions
 

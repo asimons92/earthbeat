@@ -21,7 +21,7 @@ export const oscillatorDefaults = {
   gain: 0.2,
 } as const;
 
-export const demoModulation = {
+export const modulatorDefaults = {
   channelKey: 'mag',
   targetParam: 'frequency',
   inMin: 1,

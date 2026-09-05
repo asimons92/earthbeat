@@ -8,7 +8,7 @@ Put each feature in its own folder under `docs/feature/`:
 
 `docs/feature/<slug>/`
 
-Use a short kebab-case slug that matches the product noun when you can. Examples: `modulation-graph`, `usgs-connection`, `eggshell-shell`.
+Use a short kebab-case slug that matches the product noun when you can. Examples: `modulation-graph`, `usgs-connector`, `eggshell-shell`.
 
 Add one markdown file per entry:
 

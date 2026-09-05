@@ -4,7 +4,7 @@ Read these files before you change product behavior, domain shape, or UI nouns.
 
 ## Required reading
 
-1. `docs/glossary.md` — shared nouns and verbs. Use Patch, not Pipeline. Use Connection for the source node and Modulation for the graph edge.
+1. `docs/glossary.md` — shared nouns and verbs. Use Patch, not Pipeline. Use Connector, Modulator, and Oscillator for canvas nodes. React Flow edges are plain wires. Do not use Connection as a product noun.
 2. `docs/PRD.md` — product vision, MVP scope, and the decision that write commands run in a database transaction.
 3. `clay/model.json` — domain types, commands, and catalog seeds (for example `usgs_earthquakes` and sine Oscillator defaults).
 4. `docs/feature/<slug>/` — feature journals (dated notes) for the area you are changing, when that folder exists. Convention: `docs/feature/README.md`.
