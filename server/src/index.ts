@@ -40,7 +40,8 @@ app.get('/api/health', (_req: Request, res: Response) => {
 });
 
 if (getAuthMode() === 'google') {
-  app.use('/api/auth/*', createAuthMiddleware());
+  // Express 5 path-to-regexp requires a named splat, not a bare "*".
+  app.use('/api/auth/{*authPath}', createAuthMiddleware());
 }
 
 app.post('/api/auth/local', async (_req: Request, res: Response) => {

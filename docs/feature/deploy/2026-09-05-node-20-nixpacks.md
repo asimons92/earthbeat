@@ -1,7 +1,8 @@
 # Pin Node 20 for Railway Nixpacks
 
 Date: 2026-09-05
-Status: decided
+Status: superseded
+Superseded by: [2026-09-05-dockerfile-express5-auth.md](./2026-09-05-dockerfile-express5-auth.md)
 
 ## Context
 
