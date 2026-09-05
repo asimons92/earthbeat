@@ -63,5 +63,10 @@ Runs:
 1. **oxlint** — React/TS hygiene  
 2. **stylelint** — `color-no-hex` + banned color functions except in `tokens.css`  
 3. **check-ui-colors** — bans raw colors + Tailwind palette / arbitrary color utilities in `src/**/*.{ts,tsx}`
+4. **check-theme-contrast** — WCAG AA contrast (4.5:1) for semantic surface/ink pairs in light and dark `tokens.css`
 
 Agent guidance: `.cursor/rules/ui-conventions.mdc`.
+
+## Theme contrast
+
+Keep paired tokens readable: `--primary` with `--primary-foreground`, `--background` with `--foreground`, and the other surface/ink pairs listed in `client/scripts/check-theme-contrast.mjs`. Put button and select font resets in `@layer base` so Tailwind text utilities can override `color: inherit`.

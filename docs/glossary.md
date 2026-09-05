@@ -10,9 +10,13 @@ Patch is the saved graph that a User owns. The Patch is the unit you create, ren
 
 Connector is a natural-signal node on the canvas. Example: a USGS Quakes node on the Pacific Quake Patch. A Connector lists Channels from its ConnectorKind.
 
-ConnectorKind is a catalog entry for a natural-signal API kind. Example: `usgs_earthquakes`. The catalog seeds available kinds. You add a Connector to a Patch by choosing a ConnectorKind.
+ConnectorKind is a catalog entry for a natural-signal API kind. Example: `usgs_earthquakes`. The catalog seeds available kinds. You add a Connector to a Patch by choosing a ConnectorKind from the Connector Library.
 
 Channel is one numeric output of a ConnectorKind. Example: `mag` (magnitude) on USGS Quakes, with a useful min and max range.
+
+Connector Library is the route that lists every ConnectorKind in the Clay catalog. Path: `/connectors`. Kind detail lives at `/connectors/:kindKey`.
+
+Patch Library is the route that lists Patches owned by the signed-in User. Path: `/patches`. A row opens that Patch on the canvas.
 
 Modulator is a canvas node that maps a Channel onto an Oscillator parameter. Example: `mag` to frequency with ratios of the Oscillator base. React Flow edges between nodes are plain Wires. They do not store mapping data.
 
@@ -41,6 +45,8 @@ Do not put mapping parameters on React Flow edges. Mapping belongs on a Modulato
 ## Catalog seeds
 
 `usgs_earthquakes` is the first ConnectorKind. It uses the USGS all_day GeoJSON feed. Modulatable channels are `mag`, `depthKm`, and `sig`. Display channels include `place`, `time`, and `eventId`.
+
+`noaa_coops_tides` is the second ConnectorKind. It uses the NOAA CO-OPS Data Retrieval API with product `water_level`. The default station is `9414290` (San Francisco). Modulatable channel is `waterLevel`. Display channels include `time` and `stationId`. Live poll and sample stream are not wired yet.
 
 Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with Elementary as the audio runtime. Modulatable params are `frequencyHz` and `gain`.
 

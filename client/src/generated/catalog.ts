@@ -66,12 +66,60 @@ export const connectorKinds = [
         "modulatable": false
       }
     ]
+  },
+  {
+    "key": "noaa_coops_tides",
+    "label": "NOAA Tides",
+    "description": "NOAA CO-OPS water_level product (preliminary or verified 6-minute interval). Default station is San Francisco (9414290). Live poll is a follow-up.",
+    "feedUrl": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter",
+    "defaultPollIntervalMs": 360000,
+    "defaultPlaybackHz": 1,
+    "defaultConfig": {
+      "station": "9414290",
+      "product": "water_level",
+      "datum": "MLLW",
+      "units": "metric",
+      "time_zone": "gmt",
+      "format": "json",
+      "application": "earthbeat"
+    },
+    "channels": [
+      {
+        "key": "waterLevel",
+        "label": "Water level",
+        "unit": "m",
+        "valueType": "number",
+        "source": "data[].v",
+        "modulatable": true,
+        "min": -2,
+        "max": 4,
+        "mapHintMin": -1,
+        "mapHintMax": 3
+      },
+      {
+        "key": "time",
+        "label": "Observation time",
+        "valueType": "timestamp",
+        "source": "data[].t",
+        "modulatable": false,
+        "description": "CO-OPS observation timestamp"
+      },
+      {
+        "key": "stationId",
+        "label": "Station id",
+        "valueType": "string",
+        "source": "metadata.id",
+        "modulatable": false
+      }
+    ]
   }
 ] as const;
 
 export const connectorKindsByKey = {
 
   'usgs_earthquakes': connectorKinds[0],
+
+  'noaa_coops_tides': connectorKinds[1],
 
 } as const;
 
@@ -135,38 +183,7 @@ export const shellCreateActions = [
   }
 ] as const;
 
-export const shellPaletteCategories = [
-  {
-    "key": "seismic",
-    "label": "Seismic",
-    "icon": "∿"
-  },
-  {
-    "key": "weather",
-    "label": "Weather",
-    "icon": "☁"
-  },
-  {
-    "key": "tides",
-    "label": "Tides",
-    "icon": "≋"
-  },
-  {
-    "key": "transform",
-    "label": "Transform",
-    "icon": "∼"
-  },
-  {
-    "key": "mix",
-    "label": "Mix",
-    "icon": "▥"
-  },
-  {
-    "key": "output",
-    "label": "Output",
-    "icon": "♪"
-  }
-] as const;
+export const shellPaletteCategories = [] as const;
 
 export const shellPatchTabs = [
   {
@@ -202,6 +219,27 @@ export const shellAuthActions = [
     "key": "sign_out",
     "label": "Sign out",
     "path": "/api/auth/signout"
+  }
+] as const;
+
+export const shellNavItems = [
+  {
+    "key": "canvas",
+    "label": "Canvas",
+    "path": "/",
+    "listSource": "none"
+  },
+  {
+    "key": "connectorLibrary",
+    "label": "Connector Library",
+    "path": "/connectors",
+    "listSource": "connectorKinds"
+  },
+  {
+    "key": "patchLibrary",
+    "label": "Patch Library",
+    "path": "/patches",
+    "listSource": "patches"
   }
 ] as const;
 

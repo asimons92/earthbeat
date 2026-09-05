@@ -192,7 +192,7 @@ MVP is successful when:
 ## 12. Open questions
 
 1. **Resolved for M3:** the canonical saved artifact is a **normalized domain graph** in Postgres (User, Patch, Connector, Modulator, Oscillator, Wire). React Flow is a view. Layout lives on node position fields.
-2. Which **second source** should follow earthquakes for the multi-source story?
+2. **Resolved for Connector Library:** the second ConnectorKind is `noaa_coops_tides` (NOAA CO-OPS `water_level`). Catalog and library UI ship first. Live poll and SSE follow later.
 3. How much **audio graph** detail lives in the domain model vs. opaque node config blobs?
 4. **Resolved for M3:** patches are **private-only** (owned by `userId`). Share-by-link is out of scope.
 5. **Resolved for M2:** live USGS data is **server-mediated** (Express poll + SSE). Client pulls samples over EventSource and runs Elementary audio. Revisit for multi-Connector or Patch-clock designs.

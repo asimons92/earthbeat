@@ -41,4 +41,4 @@ Do not hand-roll a second design system beside shadcn for forms, dialogs, menus,
 
 ## Verify
 
-Run `pnpm --dir client lint` after UI changes.
+Run `pnpm --dir client lint` after UI changes. Lint includes `check-theme-contrast.mjs` for light and dark surface/ink token pairs.
