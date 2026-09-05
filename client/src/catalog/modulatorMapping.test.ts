@@ -80,8 +80,13 @@ describe('blankModulatorData', () => {
     fc.assert(
       fc.property(indexArb, keyArb, (index, catalogKey) => {
         const blank = blankModulatorData(index);
-        expect([catalogKey].includes(blank.channelKey)).toEqual([].includes(catalogKey));
-        expect([catalogKey].includes(blank.targetParam)).toEqual([].includes(catalogKey));
+        const emptyKeys: string[] = [];
+        expect([catalogKey].includes(blank.channelKey)).toEqual(
+          emptyKeys.includes(catalogKey),
+        );
+        expect([catalogKey].includes(blank.targetParam)).toEqual(
+          emptyKeys.includes(catalogKey),
+        );
       }),
     );
   });

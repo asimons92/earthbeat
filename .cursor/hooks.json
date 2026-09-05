@@ -11,12 +11,25 @@
         "command": ".cursor/hooks/block-clay-generated.js",
         "matcher": "Shell",
         "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/review-typecheck.js",
+        "matcher": "Task",
+        "failClosed": false,
+        "timeout": 120
       }
     ],
     "beforeShellExecution": [
       {
         "command": ".cursor/hooks/block-clay-generated.js",
         "failClosed": false
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/review-typecheck.js",
+        "failClosed": false,
+        "timeout": 120
       }
     ]
   }

@@ -127,7 +127,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     oscillatorId: string,
     initialFreqHz: number,
     initialGain: number,
-    waveform = OSCILLATOR_WAVEFORM_KEYS[0],
+    waveform: string = OSCILLATOR_WAVEFORM_KEYS[0],
   ): Promise<VoiceControls> {
     const existing = voices.get(oscillatorId);
     const plan = planVoiceEnsure(existing?.waveform, waveform);

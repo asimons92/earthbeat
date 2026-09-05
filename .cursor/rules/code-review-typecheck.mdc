@@ -1,0 +1,12 @@
+---
+description: When reviewing code, Agent Review, Bugbot, /review, or unpushed commits, run pnpm typecheck first and treat failures as Critical findings.
+alwaysApply: false
+---
+
+# Code review typecheck
+
+When the user asks for a code review, Agent Review, Bugbot, `/review`, or a review of commits or a branch:
+
+1. Run `pnpm typecheck` from the repo root before or while reviewing.
+2. Treat every TypeScript error as a Critical finding with `file:line` and the compiler message.
+3. Still review for logic, security, and product bugs after typecheck.
