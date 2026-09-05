@@ -10,7 +10,7 @@ import {
 } from './modulationChain';
 
 export type MonitorStrip = {
-  /** Stable id: Modulator node id. */
+  /** Stable id: kindKey:channelKey. */
   id: string;
   kindKey: string;
   channelKey: string;
@@ -22,6 +22,11 @@ export type MonitorStrip = {
   /** Connector Smooth interpolate; Monitor must match Modulator Channel. */
   interpolate: boolean;
 };
+
+/** Stable Monitor strip id for one connector kind and Channel. */
+export function monitorStripId(kindKey: string, channelKey: string): string {
+  return `${kindKey}:${channelKey}`;
+}
 
 function channelLabel(kindKey: string, channelKey: string): string {
   const kind = getConnectorKind(kindKey);
@@ -37,7 +42,7 @@ export function stripFromChain(chain: ModulationChain): MonitorStrip {
   const kindKey =
     typeof chain.connector.data.kindKey === 'string' ? chain.connector.data.kindKey : '';
   return {
-    id: chain.modulator.id,
+    id: monitorStripId(kindKey, chain.channelKey),
     kindKey,
     channelKey: chain.channelKey,
     inMin: chain.inMin,
@@ -52,7 +57,10 @@ export function stripFromChain(chain: ModulationChain): MonitorStrip {
   };
 }
 
-/** One strip per complete Connector → Modulator → (Effect*) → Oscillator chain. */
+/**
+ * One strip per unique connector kind and Channel among complete
+ * Connector → Modulator → (Effect*) → Oscillator chains. First chain wins.
+ */
 export function listMonitorStrips(
   nodes: RuntimeNode[],
   edges: RuntimeEdge[],

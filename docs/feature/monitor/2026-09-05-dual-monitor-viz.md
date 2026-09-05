@@ -1,7 +1,9 @@
 # Dual Monitor signal strips and audio scope
 
 Date: 2026-09-05
-Status: decided
+Status: superseded
+
+Superseded by `2026-09-05-dedupe-strips-by-kind-channel.md` for strip count and strip id. Audio scope and incomplete-chain rules stay.
 
 ## Context
 

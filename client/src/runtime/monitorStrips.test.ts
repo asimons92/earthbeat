@@ -43,6 +43,10 @@ function oscillator(id: string): RuntimeNode {
   };
 }
 
+function stripKey(kindKey: string, channelKey: string): string {
+  return `${kindKey}:${channelKey}`;
+}
+
 const mappingArb = fc.record({
   channelKey: fc.constantFrom('mag', 'depthKm', 'sig', 'waterLevel'),
   targetParam: fc.constantFrom('frequencyHz', 'gain'),
@@ -90,7 +94,7 @@ describe('listMonitorStrips', () => {
           const strips = listMonitorStrips(nodes, edges);
           expect(strips.length).toBe(edges.length / 2);
           expect(strips[0]!.channelKey).toBe(mapping.channelKey);
-          expect(strips[0]!.id).toBe(modId);
+          expect(strips[0]!.id).toBe(stripKey(kindKey, mapping.channelKey));
           expect(strips[0]!.kindKey).toBe(kindKey);
           expect(strips[0]!.inMin).toBe(mapping.inMin);
           expect(strips[0]!.inMax).toBe(mapping.inMax);
@@ -135,14 +139,15 @@ describe('listMonitorStrips', () => {
             { id: `${effectId}-${oscId}`, source: effectId, target: oscId },
           ];
           const strips = listMonitorStrips(nodes, edges);
-          expect(strips.map((strip) => strip.id)).toEqual([modId]);
+          const expectedId = stripKey(kindKey, mapping.channelKey);
+          expect(strips.map((strip) => strip.id)).toEqual([expectedId]);
           expect(strips.map((strip) => strip.channelKey)).toEqual([mapping.channelKey]);
         },
       ),
     );
   });
 
-  it('lists one strip per complete chain when several oscillators are wired', () => {
+  it('lists one strip per unique kind and Channel across oscillators', () => {
     fc.assert(
       fc.property(
         fc.uniqueArray(idArb, { minLength: 6, maxLength: 6 }),
@@ -165,9 +170,123 @@ describe('listMonitorStrips', () => {
             { id: 'd', source: m2!, target: o2! },
           ];
           const strips = listMonitorStrips(nodes, edges);
-          const expectedIds = new Set([m1!, m2!]);
-          expect(new Set(strips.map((strip) => strip.id))).toEqual(expectedIds);
-          expect(strips.length).toBe(expectedIds.size);
+          const expectedKeys = new Set([
+            stripKey('usgs_earthquakes', mappingA.channelKey),
+            stripKey('noaa_coops_tides', mappingB.channelKey),
+          ]);
+          expect(new Set(strips.map((strip) => strip.id))).toEqual(expectedKeys);
+          expect(strips.length).toBe(expectedKeys.size);
+        },
+      ),
+    );
+  });
+
+  it('collapses duplicate kind and Channel chains to one strip', () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(idArb, { minLength: 6, maxLength: 6 }),
+        mappingArb,
+        kindArb,
+        (ids, mapping, kindKey) => {
+          const [c1, m1, o1, c2, m2, o2] = ids;
+          const mappingB = { ...mapping, targetParam: 'gain' as const };
+          const nodes = [
+            connector(c1!, kindKey),
+            modulator(m1!, mapping),
+            oscillator(o1!),
+            connector(c2!, kindKey),
+            modulator(m2!, mappingB),
+            oscillator(o2!),
+          ];
+          const edges: RuntimeEdge[] = [
+            { id: 'a', source: c1!, target: m1! },
+            { id: 'b', source: m1!, target: o1! },
+            { id: 'c', source: c2!, target: m2! },
+            { id: 'd', source: m2!, target: o2! },
+          ];
+          const strips = listMonitorStrips(nodes, edges);
+          const expectedId = stripKey(kindKey, mapping.channelKey);
+          expect(strips.map((strip) => strip.id)).toEqual([expectedId]);
+        },
+      ),
+    );
+  });
+
+  it('keeps separate strips when the same kind uses different Channels', () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(idArb, { minLength: 6, maxLength: 6 }),
+        mappingArb,
+        mappingArb,
+        kindArb,
+        (ids, mappingA, mappingB, kindKey) => {
+          fc.pre(mappingA.channelKey !== mappingB.channelKey);
+          const [c1, m1, o1, c2, m2, o2] = ids;
+          const nodes = [
+            connector(c1!, kindKey),
+            modulator(m1!, mappingA),
+            oscillator(o1!),
+            connector(c2!, kindKey),
+            modulator(m2!, mappingB),
+            oscillator(o2!),
+          ];
+          const edges: RuntimeEdge[] = [
+            { id: 'a', source: c1!, target: m1! },
+            { id: 'b', source: m1!, target: o1! },
+            { id: 'c', source: c2!, target: m2! },
+            { id: 'd', source: m2!, target: o2! },
+          ];
+          const strips = listMonitorStrips(nodes, edges);
+          const expectedKeys = new Set([
+            stripKey(kindKey, mappingA.channelKey),
+            stripKey(kindKey, mappingB.channelKey),
+          ]);
+          expect(new Set(strips.map((strip) => strip.id))).toEqual(expectedKeys);
+          expect(strips.length).toBe(expectedKeys.size);
+        },
+      ),
+    );
+  });
+
+  it('keeps first-wins Smooth and scale when kind and Channel collide', () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(idArb, { minLength: 6, maxLength: 6 }),
+        mappingArb,
+        mappingArb,
+        kindArb,
+        fc.boolean(),
+        fc.boolean(),
+        (ids, mappingA, mappingB, kindKey, interpolateA, interpolateB) => {
+          fc.pre(mappingA.channelKey === mappingB.channelKey);
+          fc.pre(
+            mappingA.inMin !== mappingB.inMin ||
+              mappingA.inMax !== mappingB.inMax ||
+              interpolateA !== interpolateB,
+          );
+          const [c1, m1, o1, c2, m2, o2] = ids;
+          const nodes = [
+            connector(c1!, kindKey, interpolateA),
+            modulator(m1!, mappingA),
+            oscillator(o1!),
+            connector(c2!, kindKey, interpolateB),
+            modulator(m2!, mappingB),
+            oscillator(o2!),
+          ];
+          const edges: RuntimeEdge[] = [
+            { id: 'a', source: c1!, target: m1! },
+            { id: 'b', source: m1!, target: o1! },
+            { id: 'c', source: c2!, target: m2! },
+            { id: 'd', source: m2!, target: o2! },
+          ];
+          const strips = listMonitorStrips(nodes, edges);
+          const expectedId = stripKey(kindKey, mappingA.channelKey);
+          expect(strips.map((strip) => strip.id)).toEqual([expectedId]);
+          expect(strips[0]!.inMin).toBe(mappingA.inMin);
+          expect(strips[0]!.inMax).toBe(mappingA.inMax);
+          expect(strips[0]!.interpolate).toBe(interpolateA);
+          expect(strips[0]!.connectorId).toBe(c1!);
+          expect(strips[0]!.oscillatorId).toBe(o1!);
         },
       ),
     );
