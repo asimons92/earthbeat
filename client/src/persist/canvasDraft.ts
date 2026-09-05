@@ -206,6 +206,13 @@ export function parseCanvasDraftPayload(raw: unknown): CanvasDraftPayload | null
   }
 }
 
+/** Result of writing a browser draft. */
+export type CanvasDraftWriteResult = {
+  ok: boolean;
+  /** Where the draft landed. `memory` after a localStorage failure is not durable across refresh. */
+  sink: 'localStorage' | 'memory';
+};
+
 function canUseLocalStorage(): boolean {
   try {
     return typeof localStorage !== 'undefined' && localStorage !== null;
@@ -228,16 +235,18 @@ function storageGet(key: string): string | null {
   return memoryDraftStore.get(key) ?? null;
 }
 
-function storageSet(key: string, value: string): void {
+function storageSet(key: string, value: string): CanvasDraftWriteResult {
   if (canUseLocalStorage()) {
     try {
       localStorage.setItem(key, value);
-      return;
+      return { ok: true, sink: 'localStorage' };
     } catch {
-      // Fall through to memory.
+      memoryDraftStore.set(key, value);
+      return { ok: false, sink: 'memory' };
     }
   }
   memoryDraftStore.set(key, value);
+  return { ok: true, sink: 'memory' };
 }
 
 function storageRemove(key: string): void {
@@ -253,17 +262,23 @@ function storageRemove(key: string): void {
 
 /** Read the browser draft for a user (or anonymous). Last write wins across tabs. */
 export function readCanvasDraft(userId: string | null | undefined): CanvasDraftPayload | null {
-  const raw = storageGet(canvasDraftStorageKey(canvasDraftUserKey(userId)));
+  const key = canvasDraftStorageKey(canvasDraftUserKey(userId));
+  const raw = storageGet(key);
   if (raw === null) return null;
-  return parseCanvasDraftPayload(raw);
+  const parsed = parseCanvasDraftPayload(raw);
+  if (parsed === null) {
+    storageRemove(key);
+    return null;
+  }
+  return parsed;
 }
 
 /** Write the browser draft for a user (or anonymous). */
 export function writeCanvasDraft(
   userId: string | null | undefined,
   payload: CanvasDraftPayload,
-): void {
-  storageSet(
+): CanvasDraftWriteResult {
+  return storageSet(
     canvasDraftStorageKey(canvasDraftUserKey(userId)),
     serializeCanvasDraftPayload(payload),
   );

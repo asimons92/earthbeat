@@ -11,11 +11,17 @@ import {
   type CanvasDraftPayload,
 } from '@/persist/canvasDraft';
 import { BLANK_PATCH_NAME } from '@/persist/patchFileActions';
+import {
+  decideSaveSuccessAction,
+  flowGraphFingerprint,
+  shouldBlockCanvasMutation,
+  shouldSuppressDraftForFingerprint,
+} from '@/persist/patchPersistRaces';
 import { decideSessionBootstrap } from '@/persist/sessionBootstrap';
 import { domainGraphToFlow, flowToDomainGraph } from '@/persist/graphMapper';
 import { trpc } from '@/trpc';
 
-export type PersistStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
+export type PersistStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict' | 'draft_error';
 
 type UsePatchPersistArgs = {
   nodes: Node[];
@@ -57,7 +63,10 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const userIdRef = useRef<string | null>(null);
   const dirtyRef = useRef(false);
   const saveInFlightRef = useRef(false);
-  const ignoreNextGraphEffectRef = useRef(true);
+  const graphEpochRef = useRef(0);
+  const suppressFingerprintRef = useRef<string | null>(
+    flowGraphFingerprint([], []),
+  );
   const draftBootstrappedRef = useRef(false);
 
   const markClean = useCallback(() => {
@@ -68,6 +77,17 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const markDirty = useCallback(() => {
     dirtyRef.current = true;
     setIsDirty(true);
+  }, []);
+
+  const cancelDraftTimer = useCallback(() => {
+    if (draftTimer.current) {
+      clearTimeout(draftTimer.current);
+      draftTimer.current = null;
+    }
+  }, []);
+
+  const markProgrammaticGraph = useCallback((nextNodes: Node[], nextEdges: Edge[]) => {
+    suppressFingerprintRef.current = flowGraphFingerprint(nextNodes, nextEdges);
   }, []);
 
   useEffect(() => {
@@ -116,14 +136,20 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
 
   const flushDraft = useCallback(
     (dirty: boolean) => {
-      writeCanvasDraft(userIdRef.current, buildDraftPayload(dirty));
+      const result = writeCanvasDraft(userIdRef.current, buildDraftPayload(dirty));
+      if (!result.ok) {
+        setPersistStatus('draft_error');
+      }
+      return result;
     },
     [buildDraftPayload],
   );
 
   const applyDraft = useCallback(
     (draft: CanvasDraftPayload) => {
-      ignoreNextGraphEffectRef.current = true;
+      const nextNodes = asFlowNodes(draft.nodes);
+      const nextEdges = asFlowEdges(draft.edges);
+      markProgrammaticGraph(nextNodes, nextEdges);
       setActivePatchId(draft.activePatchId);
       setActivePatchName(draft.activePatchName);
       setPatchVersion(draft.patchVersion);
@@ -132,15 +158,20 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
       } else {
         markClean();
       }
-      setNodes(asFlowNodes(draft.nodes));
-      setEdges(asFlowEdges(draft.edges));
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      nodesRef.current = nextNodes;
+      edgesRef.current = nextEdges;
+      patchIdRef.current = draft.activePatchId;
+      patchNameRef.current = draft.activePatchName;
+      versionRef.current = draft.patchVersion;
       if (draft.activePatchId && !draft.isDirty) {
         setPersistStatus('saved');
       } else {
         setPersistStatus('idle');
       }
     },
-    [markClean, markDirty, setEdges, setNodes],
+    [markClean, markDirty, markProgrammaticGraph, setEdges, setNodes],
   );
 
   const restoreDraftForUser = useCallback(
@@ -238,11 +269,27 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     })();
   }, [restoreDraftForUser]);
 
+  useEffect(() => {
+    const flushOnLeave = () => {
+      cancelDraftTimer();
+      flushDraft(dirtyRef.current);
+    };
+    window.addEventListener('pagehide', flushOnLeave);
+    window.addEventListener('beforeunload', flushOnLeave);
+    return () => {
+      window.removeEventListener('pagehide', flushOnLeave);
+      window.removeEventListener('beforeunload', flushOnLeave);
+    };
+  }, [cancelDraftTimer, flushDraft]);
+
   const saveNow = useCallback(async () => {
     const patchId = patchIdRef.current;
     if (!patchId) return;
     if (saveInFlightRef.current) return;
+    cancelDraftTimer();
     saveInFlightRef.current = true;
+    const epochAtStart = graphEpochRef.current;
+    const savedPatchId = patchId;
     setPersistStatus('saving');
     const graph = flowToDomainGraph(patchId, nodesRef.current, edgesRef.current);
     try {
@@ -255,11 +302,25 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         effects: graph.effects,
         wires: graph.wires,
       });
+      const action = decideSaveSuccessAction({
+        savedPatchId,
+        activePatchId: patchIdRef.current,
+        graphEpochAtSaveStart: epochAtStart,
+        graphEpochNow: graphEpochRef.current,
+      });
+      if (action === 'ignore') {
+        return;
+      }
       setPatchVersion(Number(result.version));
       versionRef.current = Number(result.version);
-      markClean();
-      flushDraft(false);
-      setPersistStatus('saved');
+      if (action === 'clean') {
+        markClean();
+        flushDraft(false);
+        setPersistStatus('saved');
+      } else {
+        flushDraft(true);
+        setPersistStatus('idle');
+      }
       await invalidateListRef.current();
     } catch (error) {
       if (error instanceof TRPCClientError && error.data?.code === 'CONFLICT') {
@@ -270,53 +331,70 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     } finally {
       saveInFlightRef.current = false;
     }
-  }, [flushDraft, markClean]);
+  }, [cancelDraftTimer, flushDraft, markClean]);
 
   const scheduleDraftPersist = useCallback(() => {
-    if (ignoreNextGraphEffectRef.current) {
-      ignoreNextGraphEffectRef.current = false;
+    const liveFingerprint = flowGraphFingerprint(nodesRef.current, edgesRef.current);
+    if (
+      shouldSuppressDraftForFingerprint(suppressFingerprintRef.current, liveFingerprint)
+    ) {
       return;
     }
+    suppressFingerprintRef.current = null;
+    graphEpochRef.current += 1;
     markDirty();
-    if (draftTimer.current) clearTimeout(draftTimer.current);
+    cancelDraftTimer();
     draftTimer.current = setTimeout(() => {
+      draftTimer.current = null;
       flushDraft(true);
     }, 400);
-  }, [flushDraft, markDirty]);
+  }, [cancelDraftTimer, flushDraft, markDirty]);
 
   const createPatch = useCallback(
     async (name: string) => {
-      const created = await createMutateRef.current({ name });
-      setActivePatchId(created.id);
-      setActivePatchName(created.name);
-      patchIdRef.current = created.id;
-      patchNameRef.current = created.name;
-      setPatchVersion(Number(created.version));
-      versionRef.current = Number(created.version);
-      const graph = flowToDomainGraph(created.id, nodesRef.current, edgesRef.current);
-      const saved = await replaceMutateRef.current({
-        id: created.id,
-        expectedVersion: Number(created.version),
-        connectors: graph.connectors,
-        modulators: graph.modulators,
-        oscillators: graph.oscillators,
-        effects: graph.effects,
-        wires: graph.wires,
-      });
-      setPatchVersion(Number(saved.version));
-      versionRef.current = Number(saved.version);
-      markClean();
-      ignoreNextGraphEffectRef.current = true;
-      flushDraft(false);
-      setPersistStatus('saved');
-      await invalidateListRef.current();
-      return created;
+      if (shouldBlockCanvasMutation(saveInFlightRef.current)) return undefined;
+      cancelDraftTimer();
+      saveInFlightRef.current = true;
+      setPersistStatus('saving');
+      try {
+        const created = await createMutateRef.current({ name });
+        setActivePatchId(created.id);
+        setActivePatchName(created.name);
+        patchIdRef.current = created.id;
+        patchNameRef.current = created.name;
+        setPatchVersion(Number(created.version));
+        versionRef.current = Number(created.version);
+        const graph = flowToDomainGraph(created.id, nodesRef.current, edgesRef.current);
+        const saved = await replaceMutateRef.current({
+          id: created.id,
+          expectedVersion: Number(created.version),
+          connectors: graph.connectors,
+          modulators: graph.modulators,
+          oscillators: graph.oscillators,
+          effects: graph.effects,
+          wires: graph.wires,
+        });
+        setPatchVersion(Number(saved.version));
+        versionRef.current = Number(saved.version);
+        markClean();
+        flushDraft(false);
+        setPersistStatus('saved');
+        await invalidateListRef.current();
+        return created;
+      } catch {
+        setPersistStatus('error');
+        return undefined;
+      } finally {
+        saveInFlightRef.current = false;
+      }
     },
-    [flushDraft, markClean],
+    [cancelDraftTimer, flushDraft, markClean],
   );
 
   const loadPatch = useCallback(
     async (id: string) => {
+      if (shouldBlockCanvasMutation(saveInFlightRef.current)) return;
+      cancelDraftTimer();
       const patch = await fetchPatchRef.current({ id });
       setActivePatchId(patch.id);
       setActivePatchName(patch.name);
@@ -328,7 +406,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         effects: patch.effects ?? [],
         wires: patch.wires,
       });
-      ignoreNextGraphEffectRef.current = true;
+      markProgrammaticGraph(nextNodes, nextEdges);
       markClean();
       setNodes(nextNodes);
       setEdges(nextEdges);
@@ -340,18 +418,19 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
       flushDraft(false);
       setPersistStatus('saved');
     },
-    [flushDraft, markClean, setEdges, setNodes],
+    [cancelDraftTimer, flushDraft, markClean, markProgrammaticGraph, setEdges, setNodes],
   );
 
   const newBlankPatch = useCallback(() => {
-    if (draftTimer.current) clearTimeout(draftTimer.current);
+    if (shouldBlockCanvasMutation(saveInFlightRef.current)) return;
+    cancelDraftTimer();
     setActivePatchId(null);
     setActivePatchName(BLANK_PATCH_NAME);
     setPatchVersion(1);
     patchIdRef.current = null;
     patchNameRef.current = BLANK_PATCH_NAME;
     versionRef.current = 1;
-    ignoreNextGraphEffectRef.current = true;
+    markProgrammaticGraph([], []);
     markClean();
     setNodes([]);
     setEdges([]);
@@ -359,10 +438,10 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     edgesRef.current = [];
     clearCanvasDraft(userIdRef.current);
     setPersistStatus('idle');
-  }, [markClean, setEdges, setNodes]);
+  }, [cancelDraftTimer, markClean, markProgrammaticGraph, setEdges, setNodes]);
 
   const blankForSignOut = useCallback(() => {
-    if (draftTimer.current) clearTimeout(draftTimer.current);
+    cancelDraftTimer();
     // Keep stored draft for this user; only blank the live canvas.
     const retainedUserId = userIdRef.current;
     if (dirtyRef.current) {
@@ -374,7 +453,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     patchIdRef.current = null;
     patchNameRef.current = BLANK_PATCH_NAME;
     versionRef.current = 1;
-    ignoreNextGraphEffectRef.current = true;
+    markProgrammaticGraph([], []);
     markClean();
     setNodes([]);
     setEdges([]);
@@ -384,10 +463,13 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     setSessionReady(false);
     setPersistStatus('idle');
     void retainedUserId;
-  }, [flushDraft, markClean, setEdges, setNodes]);
+  }, [cancelDraftTimer, flushDraft, markClean, markProgrammaticGraph, setEdges, setNodes]);
 
   const deletePatch = useCallback(
     async (id: string, expectedVersion: number) => {
+      if (shouldBlockCanvasMutation(saveInFlightRef.current)) {
+        return { wasActive: false };
+      }
       const wasActive = patchIdRef.current === id;
       await deleteMutateRef.current({ id, expectedVersion });
       await invalidateListRef.current();

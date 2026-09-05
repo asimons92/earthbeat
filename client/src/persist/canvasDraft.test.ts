@@ -240,10 +240,29 @@ describe('readCanvasDraft / writeCanvasDraft / clearCanvasDraft', () => {
       fc.property(optionalIdArb, draftPayloadArb, (userId, payload) => {
         clearCanvasDraft(userId);
         expect(readCanvasDraft(userId)).toBeNull();
-        writeCanvasDraft(userId, payload);
+        const written = writeCanvasDraft(userId, payload);
+        expect(written.sink === 'localStorage' || written.sink === 'memory').toBe(
+          readCanvasDraft(userId) !== null,
+        );
         expect(readCanvasDraft(userId)).toEqual(payload);
         clearCanvasDraft(userId);
         expect(readCanvasDraft(userId)).toBeNull();
+      }),
+    );
+  });
+
+  it('removes corrupt stored drafts on read', () => {
+    fc.assert(
+      fc.property(optionalIdArb, fc.string({ minLength: 1 }), (userId, garbage) => {
+        fc.pre(parseCanvasDraftPayload(garbage) === null);
+        const key = canvasDraftStorageKey(canvasDraftUserKey(userId));
+        try {
+          localStorage.setItem(key, garbage);
+        } catch {
+          return;
+        }
+        expect(readCanvasDraft(userId)).toBeNull();
+        expect(localStorage.getItem(key)).toBeNull();
       }),
     );
   });

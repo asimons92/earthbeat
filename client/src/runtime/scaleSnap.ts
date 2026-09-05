@@ -1,28 +1,17 @@
 /** Equal-temperament scale snap for ScaleSnap Effects (A4 reference). */
 
+import { scaleSnapScales, scaleSnapTonics } from '@/generated/catalog';
+
 export const MIN_AUDIBLE_HZ = 20;
 
-export const TONIC_PITCH_CLASSES: Readonly<Record<string, number>> = {
-  C: 0,
-  'C#': 1,
-  D: 2,
-  'D#': 3,
-  E: 4,
-  F: 5,
-  'F#': 6,
-  G: 7,
-  'G#': 8,
-  A: 9,
-  'A#': 10,
-  B: 11,
-};
+export const TONIC_PITCH_CLASSES: Readonly<Record<string, number>> = Object.fromEntries(
+  scaleSnapTonics.map((tonic, index) => [tonic.key, index]),
+);
 
-export const SCALE_DEGREES: Readonly<Record<string, readonly number[]>> = {
-  major: [0, 2, 4, 5, 7, 9, 11],
-  natural_minor: [0, 2, 3, 5, 7, 8, 10],
-  major_pentatonic: [0, 2, 4, 7, 9],
-  minor_pentatonic: [0, 3, 5, 7, 10],
-};
+/** Scale intervals from Clay catalog (same source as inspector labels). */
+export const SCALE_DEGREES: Readonly<Record<string, readonly number[]>> = Object.fromEntries(
+  scaleSnapScales.map((scale) => [scale.key, scale.degrees]),
+);
 
 export type ScaleSnapParams = {
   enabled: boolean;
@@ -70,7 +59,8 @@ export function snapFrequencyToScale(
   const tonicPc = pitchClassForTonic(params.tonic);
   const degrees = degreesForScale(params.scaleKey);
   if (tonicPc === undefined || !degrees || degrees.length === 0) {
-    return Math.max(MIN_AUDIBLE_HZ, frequencyHz);
+    // Unknown tonic/scale: leave Hertz unchanged (fail open).
+    return frequencyHz;
   }
 
   const a4Hz = params.a4Hz > 0 ? params.a4Hz : 440;

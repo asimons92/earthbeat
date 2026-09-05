@@ -25,6 +25,7 @@ function persistLabel(status: string) {
   if (status === 'saved') return 'Saved';
   if (status === 'conflict') return 'Version conflict';
   if (status === 'error') return 'Save failed';
+  if (status === 'draft_error') return 'Draft not stored';
   return 'Not saved';
 }
 

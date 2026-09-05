@@ -52,6 +52,8 @@ export type VoiceGraph = {
   gainChain: ModulationChain | null;
 };
 
+const SCALE_SNAP_KIND = 'scale_snap';
+
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
@@ -64,7 +66,12 @@ function asBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
-function toScaleSnapEffect(node: RuntimeNode): ScaleSnapEffectNode {
+function isScaleSnapEffect(node: RuntimeNode): boolean {
+  return node.type === 'effect' && asString(node.data.kindKey, '') === SCALE_SNAP_KIND;
+}
+
+function toScaleSnapEffect(node: RuntimeNode): ScaleSnapEffectNode | null {
+  if (!isScaleSnapEffect(node)) return null;
   return {
     id: node.id,
     enabled: asBoolean(node.data.enabled, true),
@@ -108,72 +115,91 @@ function connectorUpstreamOf(
 }
 
 /**
- * From an Oscillator inbound source, walk back through Effects to a Modulator (if any).
- * Returns Effects in source-to-sink order.
+ * Walk forward from a Modulator through Effects to the Oscillator.
+ * Returns each Effect path (source-to-sink). Shared Effect fan-in yields one path per Modulator.
  */
-function resolvePathFromInbound(
-  inboundSource: RuntimeNode,
-  oscillator: RuntimeNode,
+function effectPathsFromModulatorToOscillator(
+  modulatorId: string,
+  oscillatorId: string,
   byId: Map<string, RuntimeNode>,
   edges: RuntimeEdge[],
-): { modulator: RuntimeNode | null; effects: RuntimeNode[] } {
-  if (inboundSource.type === 'modulator') {
-    return { modulator: inboundSource, effects: [] };
-  }
-  if (inboundSource.type !== 'effect') {
-    return { modulator: null, effects: [] };
+): RuntimeNode[][] {
+  const paths: RuntimeNode[][] = [];
+
+  function walk(cursorId: string, effects: RuntimeNode[], visited: Set<string>) {
+    const outbound = edges.filter((edge) => edge.source === cursorId);
+    for (const edge of outbound) {
+      const next = byId.get(edge.target);
+      if (!next || visited.has(next.id)) continue;
+      if (next.type === 'oscillator' && next.id === oscillatorId) {
+        paths.push(effects.slice());
+        continue;
+      }
+      if (next.type !== 'effect') continue;
+      const nextVisited = new Set(visited);
+      nextVisited.add(next.id);
+      walk(next.id, [...effects, next], nextVisited);
+    }
   }
 
-  const sinkToSource: RuntimeNode[] = [inboundSource];
-  let cursor = inboundSource.id;
-  const visited = new Set<string>([oscillator.id, inboundSource.id]);
-
-  while (true) {
-    const inbound = edges.filter((edge) => edge.target === cursor);
-    if (inbound.length === 0) {
-      return { modulator: null, effects: sinkToSource.slice().reverse() };
-    }
-    const preferred =
-      inbound.find((edge) => {
-        const node = byId.get(edge.source);
-        return node?.type === 'effect' || node?.type === 'modulator';
-      }) ?? inbound[0]!;
-    const next = byId.get(preferred.source);
-    if (!next || visited.has(next.id)) {
-      return { modulator: null, effects: sinkToSource.slice().reverse() };
-    }
-    visited.add(next.id);
-    if (next.type === 'effect') {
-      sinkToSource.push(next);
-      cursor = next.id;
-      continue;
-    }
-    if (next.type === 'modulator') {
-      return { modulator: next, effects: sinkToSource.slice().reverse() };
-    }
-    return { modulator: null, effects: sinkToSource.slice().reverse() };
-  }
+  walk(modulatorId, [], new Set([modulatorId]));
+  return paths;
 }
 
-/** Effect-only chain into the Oscillator (no Modulator), source-to-sink. */
-function effectOnlyChain(
+/**
+ * Effect chain into the Oscillator from one inbound Effect, source-to-sink.
+ * Stops walking back when the upstream is not an Effect (Modulator or other).
+ */
+function effectChainFromInbound(
+  inboundEffect: RuntimeNode,
   oscillatorId: string,
   byId: Map<string, RuntimeNode>,
   edges: RuntimeEdge[],
 ): RuntimeNode[] {
+  const sinkToSource: RuntimeNode[] = [inboundEffect];
+  let cursor = inboundEffect.id;
+  const visited = new Set<string>([oscillatorId, inboundEffect.id]);
+
+  while (true) {
+    const inbound = edges.filter((edge) => edge.target === cursor);
+    const effectEdge = inbound.find((edge) => byId.get(edge.source)?.type === 'effect');
+    if (!effectEdge) break;
+    const next = byId.get(effectEdge.source);
+    if (!next || visited.has(next.id)) break;
+    visited.add(next.id);
+    sinkToSource.push(next);
+    cursor = next.id;
+  }
+
+  return sinkToSource.slice().reverse();
+}
+
+/**
+ * Every Scale Snap Effect that reaches the Oscillator through Effect wiring.
+ * Includes parallel Effect→Oscillator paths and Effects on gain Modulator paths.
+ */
+function collectInboundScaleSnapEffects(
+  oscillatorId: string,
+  byId: Map<string, RuntimeNode>,
+  edges: RuntimeEdge[],
+): ScaleSnapEffectNode[] {
+  const ordered: ScaleSnapEffectNode[] = [];
+  const seen = new Set<string>();
   const intoOsc = edges.filter((edge) => edge.target === oscillatorId);
-  const effectEdge = intoOsc.find((edge) => byId.get(edge.source)?.type === 'effect');
-  if (!effectEdge) return [];
-  const source = byId.get(effectEdge.source);
-  if (!source) return [];
-  const { modulator, effects } = resolvePathFromInbound(
-    source,
-    byId.get(oscillatorId) ?? { id: oscillatorId, type: 'oscillator', data: {} },
-    byId,
-    edges,
-  );
-  if (modulator) return [];
-  return effects;
+
+  for (const edge of intoOsc) {
+    const source = byId.get(edge.source);
+    if (!source || source.type !== 'effect') continue;
+    const chain = effectChainFromInbound(source, oscillatorId, byId, edges);
+    for (const node of chain) {
+      const snap = toScaleSnapEffect(node);
+      if (!snap || seen.has(snap.id)) continue;
+      seen.add(snap.id);
+      ordered.push(snap);
+    }
+  }
+
+  return ordered;
 }
 
 /** All complete Connector → Modulator → (Effect*) → Oscillator chains into one Oscillator. */
@@ -188,20 +214,16 @@ export function findCompleteModulationChains(
 
   const chains: ModulationChain[] = [];
   const seenModulators = new Set<string>();
-  const intoOsc = edges.filter((edge) => edge.target === oscillatorId);
 
-  for (const edge of intoOsc) {
-    const source = byId.get(edge.source);
-    if (!source) continue;
-    if (source.type !== 'modulator' && source.type !== 'effect') continue;
-
-    const { modulator, effects } = resolvePathFromInbound(source, oscillator, byId, edges);
-    if (!modulator || seenModulators.has(modulator.id)) continue;
-    const connector = connectorUpstreamOf(modulator.id, byId, edges);
+  for (const node of nodes) {
+    if (node.type !== 'modulator') continue;
+    if (seenModulators.has(node.id)) continue;
+    const connector = connectorUpstreamOf(node.id, byId, edges);
     if (!connector) continue;
-
-    seenModulators.add(modulator.id);
-    chains.push(modulationFrom(connector, modulator, oscillator, effects));
+    const paths = effectPathsFromModulatorToOscillator(node.id, oscillatorId, byId, edges);
+    if (paths.length === 0) continue;
+    seenModulators.add(node.id);
+    chains.push(modulationFrom(connector, node, oscillator, paths[0]!));
   }
 
   return chains;
@@ -255,13 +277,9 @@ export function findVoiceGraph(
     chains.find((chain) => chain.targetParam === 'frequencyHz') ?? null;
   const gainChain = chains.find((chain) => chain.targetParam === 'gain') ?? null;
 
-  const frequencyEffects = frequencyChain
-    ? frequencyChain.effects.map(toScaleSnapEffect)
-    : effectOnlyChain(oscillatorId, byId, edges).map(toScaleSnapEffect);
-
   return {
     oscillator,
-    frequencyEffects,
+    frequencyEffects: collectInboundScaleSnapEffects(oscillatorId, byId, edges),
     frequencyChain,
     gainChain,
   };

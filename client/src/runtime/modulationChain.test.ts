@@ -156,6 +156,20 @@ describe('findModulationChain', () => {
   });
 });
 
+function scaleSnapEffect(id: string): RuntimeNode {
+  return {
+    id,
+    type: 'effect',
+    data: {
+      kindKey: 'scale_snap',
+      tonic: 'C',
+      scaleKey: 'major',
+      enabled: true,
+      a4Hz: 440,
+    },
+  };
+}
+
 describe('findVoiceGraph', () => {
   it('keeps gain Modulators off the frequency Effect path', () => {
     fc.assert(
@@ -182,17 +196,7 @@ describe('findVoiceGraph', () => {
           const nodes: RuntimeNode[] = [
             connector(connF!),
             modulator(modF!, freqMapping),
-            {
-              id: effectId!,
-              type: 'effect',
-              data: {
-                kindKey: 'scale_snap',
-                tonic: 'C',
-                scaleKey: 'major',
-                enabled: true,
-                a4Hz: 440,
-              },
-            },
+            scaleSnapEffect(effectId!),
             oscillator(oscId!),
             connector(connG!),
             modulator(modG!, gainMapping),
@@ -221,6 +225,172 @@ describe('findVoiceGraph', () => {
           );
         },
       ),
+    );
+  });
+
+  it('keeps both Modulators when they share one Effect into the Oscillator', () => {
+    fc.assert(
+      fc.property(fc.uniqueArray(idArb, { minLength: 6, maxLength: 6 }), (ids) => {
+        const [connF, modF, connG, modG, effectId, oscId] = ids;
+        const freqMapping = {
+          channelKey: 'mag',
+          targetParam: 'frequencyHz',
+          inMin: 1,
+          inMax: 8,
+          outMin: 0.5,
+          outMax: 4,
+        };
+        const gainMapping = {
+          channelKey: 'mag',
+          targetParam: 'gain',
+          inMin: 1,
+          inMax: 8,
+          outMin: 0,
+          outMax: 1,
+        };
+        const nodes: RuntimeNode[] = [
+          connector(connF!),
+          modulator(modF!, freqMapping),
+          connector(connG!),
+          modulator(modG!, gainMapping),
+          scaleSnapEffect(effectId!),
+          oscillator(oscId!),
+        ];
+        const edges: RuntimeEdge[] = [
+          { id: 'a', source: connF!, target: modF! },
+          { id: 'b', source: connG!, target: modG! },
+          { id: 'c', source: modF!, target: effectId! },
+          { id: 'd', source: modG!, target: effectId! },
+          { id: 'e', source: effectId!, target: oscId! },
+        ];
+        const graph = findVoiceGraph(nodes, edges, oscId!);
+        const modulatorIds = [
+          graph.frequencyChain?.modulator.id,
+          graph.gainChain?.modulator.id,
+        ].filter((value): value is string => typeof value === 'string');
+        expect([...modulatorIds].sort().join('\0')).toBe([modF!, modG!].sort().join('\0'));
+        const expectedEffectIds = nodes
+          .filter((node) => node.type === 'effect' && node.data.kindKey === 'scale_snap')
+          .map((node) => node.id);
+        expect(graph.frequencyEffects.map((effect) => effect.id)).toEqual(expectedEffectIds);
+      }),
+    );
+  });
+
+  it('snaps when a frequency Modulator wires the Oscillator and an Effect wires in parallel', () => {
+    fc.assert(
+      fc.property(fc.uniqueArray(idArb, { minLength: 5, maxLength: 5 }), (ids) => {
+        const [connId, modId, effectId, oscId, unused] = ids;
+        void unused;
+        const mapping = {
+          channelKey: 'mag',
+          targetParam: 'frequencyHz',
+          inMin: 1,
+          inMax: 8,
+          outMin: 0.5,
+          outMax: 4,
+        };
+        const nodes: RuntimeNode[] = [
+          connector(connId!),
+          modulator(modId!, mapping),
+          scaleSnapEffect(effectId!),
+          oscillator(oscId!),
+        ];
+        const edges: RuntimeEdge[] = [
+          { id: 'a', source: connId!, target: modId! },
+          { id: 'b', source: modId!, target: oscId! },
+          { id: 'c', source: effectId!, target: oscId! },
+        ];
+        const graph = findVoiceGraph(nodes, edges, oscId!);
+        expect(graph.frequencyChain?.modulator.id).toBe(modId);
+        const expectedEffectIds = nodes
+          .filter((node) => node.type === 'effect')
+          .map((node) => node.id);
+        expect(graph.frequencyEffects.map((effect) => effect.id)).toEqual(expectedEffectIds);
+      }),
+    );
+  });
+
+  it('snaps Effects on a gain path even when frequency Modulates the Oscillator directly', () => {
+    fc.assert(
+      fc.property(fc.uniqueArray(idArb, { minLength: 6, maxLength: 6 }), (ids) => {
+        const [connF, modF, connG, modG, effectId, oscId] = ids;
+        const freqMapping = {
+          channelKey: 'mag',
+          targetParam: 'frequencyHz',
+          inMin: 1,
+          inMax: 8,
+          outMin: 0.5,
+          outMax: 4,
+        };
+        const gainMapping = {
+          channelKey: 'mag',
+          targetParam: 'gain',
+          inMin: 1,
+          inMax: 8,
+          outMin: 0,
+          outMax: 1,
+        };
+        const nodes: RuntimeNode[] = [
+          connector(connF!),
+          modulator(modF!, freqMapping),
+          connector(connG!),
+          modulator(modG!, gainMapping),
+          scaleSnapEffect(effectId!),
+          oscillator(oscId!),
+        ];
+        const edges: RuntimeEdge[] = [
+          { id: 'a', source: connF!, target: modF! },
+          { id: 'b', source: modF!, target: oscId! },
+          { id: 'c', source: connG!, target: modG! },
+          { id: 'd', source: modG!, target: effectId! },
+          { id: 'e', source: effectId!, target: oscId! },
+        ];
+        const graph = findVoiceGraph(nodes, edges, oscId!);
+        expect(graph.frequencyChain?.modulator.id).toBe(modF);
+        expect(graph.gainChain?.modulator.id).toBe(modG);
+        const expectedEffectIds = nodes
+          .filter((node) => node.type === 'effect' && node.data.kindKey === 'scale_snap')
+          .map((node) => node.id);
+        expect(graph.frequencyEffects.map((effect) => effect.id)).toEqual(expectedEffectIds);
+      }),
+    );
+  });
+
+  it('ignores Effect nodes that are not Scale Snap', () => {
+    fc.assert(
+      fc.property(fc.uniqueArray(idArb, { minLength: 4, maxLength: 4 }), (ids) => {
+        const [connId, modId, effectId, oscId] = ids;
+        const mapping = {
+          channelKey: 'mag',
+          targetParam: 'frequencyHz',
+          inMin: 1,
+          inMax: 8,
+          outMin: 0.5,
+          outMax: 4,
+        };
+        const nodes: RuntimeNode[] = [
+          connector(connId!),
+          modulator(modId!, mapping),
+          {
+            id: effectId!,
+            type: 'effect',
+            data: { kindKey: 'future_kind', tonic: 'C', scaleKey: 'major', enabled: true },
+          },
+          oscillator(oscId!),
+        ];
+        const edges: RuntimeEdge[] = [
+          { id: 'a', source: connId!, target: modId! },
+          { id: 'b', source: modId!, target: effectId! },
+          { id: 'c', source: effectId!, target: oscId! },
+        ];
+        const graph = findVoiceGraph(nodes, edges, oscId!);
+        expect(graph.frequencyChain?.modulator.id).toBe(modId);
+        const expectedSnaps = nodes
+          .filter((node) => node.type === 'effect' && node.data.kindKey === 'scale_snap')
+          .map((node) => node.id);
+        expect(graph.frequencyEffects.map((effect) => effect.id)).toEqual(expectedSnaps);
+      }),
     );
   });
 });

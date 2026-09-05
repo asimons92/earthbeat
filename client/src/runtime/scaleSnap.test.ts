@@ -1,6 +1,8 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
+import { scaleSnapScales, scaleSnapTonics } from '@/generated/catalog';
+
 import {
   SCALE_DEGREES,
   TONIC_PITCH_CLASSES,
@@ -42,12 +44,40 @@ function scaleMidiFor(
   return 12 * (octave + 1) + pc;
 }
 
+describe('catalog alignment', () => {
+  it('keeps SCALE_DEGREES and tonics aligned with the Clay catalog', () => {
+    const catalogDegrees = Object.fromEntries(
+      scaleSnapScales.map((scale) => [scale.key, [...scale.degrees]]),
+    );
+    const runtimeDegrees = Object.fromEntries(
+      Object.entries(SCALE_DEGREES).map(([key, degrees]) => [key, [...degrees]]),
+    );
+    expect(runtimeDegrees).toEqual(catalogDegrees);
+
+    const catalogTonics = Object.fromEntries(
+      scaleSnapTonics.map((tonic, index) => [tonic.key, index]),
+    );
+    expect({ ...TONIC_PITCH_CLASSES }).toEqual(catalogTonics);
+  });
+});
+
 describe('snapFrequencyToScale', () => {
   it('is identity when the Effect is disabled', () => {
     fc.assert(
       fc.property(hzArb, tonicArb, scaleKeyArb, a4Arb, (hz, tonic, scaleKey, a4Hz) => {
         const out = snapFrequencyToScale(hz, params(tonic, scaleKey, false, a4Hz));
         expect(out).toBe(hz);
+      }),
+    );
+  });
+
+  it('passes through Hertz when tonic or scaleKey is unknown', () => {
+    fc.assert(
+      fc.property(hzArb, a4Arb, (hz, a4Hz) => {
+        const badTonic = snapFrequencyToScale(hz, params('NotATonic', 'major', true, a4Hz));
+        const badScale = snapFrequencyToScale(hz, params('C', 'not_a_scale', true, a4Hz));
+        expect(badTonic).toBe(hz);
+        expect(badScale).toBe(hz);
       }),
     );
   });

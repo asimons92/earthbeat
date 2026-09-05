@@ -1,7 +1,7 @@
 # Serialize Elementary rebuild on Stop
 
 Date: 2026-09-05
-Status: decided
+Status: superseded
 
 ## Context
 
@@ -17,4 +17,4 @@ A later stale render must not restore a removed voice after Stop.
 
 ## Follow-up
 
-None.
+Superseded by `2026-09-05-rebuild-queue-survives-failure.md` for rejected-render handling.

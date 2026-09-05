@@ -7,6 +7,7 @@ import {
   planVoiceEnsure,
   resolveOscillatorWaveform,
 } from './oscillatorTone';
+import { enqueueSerialTask } from './serialTaskQueue';
 
 export type VoiceControls = {
   setFrequency: (freqHz: number) => Promise<void>;
@@ -59,7 +60,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
   let rebuildQueue: Promise<void> = Promise.resolve();
 
   function enqueueRebuild(): Promise<void> {
-    rebuildQueue = rebuildQueue.then(async () => {
+    rebuildQueue = enqueueSerialTask(rebuildQueue, async () => {
       const tones = [...voices.values()].map((voice) => voice.tone);
       if (tones.length === 0) {
         const silence = el.const({ value: 0 });
