@@ -20,10 +20,19 @@ import {
 import { buildConnectorNode } from '@/catalog/buildConnectorNode';
 import { buildEffectNode } from '@/catalog/buildEffectNode';
 import {
+  autofillModulatorChannel,
+  autofillModulatorTarget,
+  blankModulatorData,
+  modulatorMappingFromUnknown,
+  type ModulatorChannelOption,
+  type ModulatorTargetOption,
+} from '@/catalog/modulatorMapping';
+import {
   connectorKindsByKey,
   effectKindsByKey,
-  modulatorDefaults,
+  modulatableChannelsForKind,
   oscillatorDefaults,
+  oscillatorModulatableParams,
 } from '@/generated/catalog';
 import { usePatchPersist } from '@/persist/usePatchPersist';
 import { usePatchRuntime } from '@/runtime/usePatchRuntime';
@@ -34,6 +43,70 @@ import { type OscillatorFlowNode } from '@/nodes/OscillatorNode';
 
 function nextOffset(count: number) {
   return { x: 60 + (count % 5) * 36, y: 60 + (count % 5) * 36 };
+}
+
+function channelOptionsForKind(kindKey: string): ModulatorChannelOption[] {
+  return modulatableChannelsForKind(kindKey).map((channel) => ({
+    key: channel.key,
+    label: channel.label,
+    min: channel.min,
+    max: channel.max,
+    ...('mapHintMin' in channel ? { mapHintMin: Number(channel.mapHintMin) } : {}),
+    ...('mapHintMax' in channel ? { mapHintMax: Number(channel.mapHintMax) } : {}),
+  }));
+}
+
+const targetOptions: ModulatorTargetOption[] = oscillatorModulatableParams.map((param) => ({
+  key: param.key,
+  label: param.label,
+  modulationOutMin: param.modulationOutMin,
+  modulationOutMax: param.modulationOutMax,
+  modulationKind: param.modulationKind,
+}));
+
+function walkDownstreamOscillator(
+  startId: string,
+  nodes: Node[],
+  edges: Edge[],
+): Node | null {
+  let cursor = startId;
+  const visited = new Set<string>();
+  while (true) {
+    if (visited.has(cursor)) return null;
+    visited.add(cursor);
+    const outbound = edges.find((edge) => edge.source === cursor);
+    if (!outbound) return null;
+    const next = nodes.find((entry) => entry.id === outbound.target);
+    if (!next) return null;
+    if (next.type === 'oscillator') return next;
+    if (next.type === 'effect') {
+      cursor = next.id;
+      continue;
+    }
+    return null;
+  }
+}
+
+function applyModulatorAutofills(nodes: Node[], edges: Edge[]): Node[] {
+  return nodes.map((node) => {
+    if (node.type !== 'modulator') return node;
+    let data = modulatorMappingFromUnknown(node.data as Record<string, unknown>);
+    const inbound = edges.find((edge) => edge.target === node.id);
+    const upstream = inbound
+      ? nodes.find((entry) => entry.id === inbound.source)
+      : undefined;
+    const channels =
+      upstream?.type === 'connector'
+        ? channelOptionsForKind(String(upstream.data.kindKey ?? ''))
+        : [];
+    if (channels.length > 0) {
+      data = autofillModulatorChannel(data, channels, targetOptions);
+    }
+    if (walkDownstreamOscillator(node.id, nodes, edges)) {
+      data = autofillModulatorTarget(data, targetOptions, channels);
+    }
+    return { ...node, data };
+  });
 }
 
 type PatchWorkspaceValue = {
@@ -191,9 +264,13 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
 
   const onConnect = useCallback<OnConnect>(
     (connection) => {
-      setEdges((current) => addEdge(connection, current));
+      setEdges((currentEdges) => {
+        const nextEdges = addEdge(connection, currentEdges);
+        setNodes((currentNodes) => applyModulatorAutofills(currentNodes, nextEdges));
+        return nextEdges;
+      });
     },
-    [setEdges],
+    [setEdges, setNodes],
   );
 
   const onSelectionChange = useCallback<OnSelectionChangeFunc>(({ nodes: selectedNodes }) => {
@@ -237,16 +314,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
         id: `modulator-${crypto.randomUUID()}`,
         type: 'modulator',
         position,
-        data: {
-          label: index === 0 ? 'Magnitude → Frequency' : `Modulator ${index + 1}`,
-          channelKey: modulatorDefaults.channelKey,
-          targetParam: modulatorDefaults.targetParam,
-          inMin: modulatorDefaults.inMin,
-          inMax: modulatorDefaults.inMax,
-          outMin: modulatorDefaults.outMin,
-          outMax: modulatorDefaults.outMax,
-          status: `${modulatorDefaults.inMin}–${modulatorDefaults.inMax} → ${modulatorDefaults.outMin}–${modulatorDefaults.outMax}`,
-        },
+        data: blankModulatorData(index),
       };
       return [...current, node];
     });

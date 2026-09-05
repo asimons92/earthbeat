@@ -188,7 +188,7 @@ export function NodeInspector({
           <Label htmlFor="modulator-channel">Channel</Label>
           {upstreamConnector ? (
             <Select
-              value={data.channelKey}
+              value={data.channelKey.length > 0 ? data.channelKey : undefined}
               onValueChange={(value) => {
                 if (value) patchModulator({ channelKey: value });
               }}
@@ -214,7 +214,7 @@ export function NodeInspector({
           <Label htmlFor="modulator-target">Target param</Label>
           {downstreamOscillator ? (
             <Select
-              value={data.targetParam}
+              value={data.targetParam.length > 0 ? data.targetParam : undefined}
               onValueChange={(value) => {
                 if (value) patchModulator({ targetParam: value });
               }}

@@ -86,15 +86,20 @@ function modulationFrom(
   modulator: RuntimeNode,
   oscillator: RuntimeNode,
   effects: RuntimeNode[],
-): ModulationChain {
+): ModulationChain | null {
+  const channelKey =
+    typeof modulator.data.channelKey === 'string' ? modulator.data.channelKey : '';
+  const targetParam =
+    typeof modulator.data.targetParam === 'string' ? modulator.data.targetParam : '';
+  if (channelKey.length === 0 || targetParam.length === 0) return null;
   return {
     complete: true,
     connector,
     modulator,
     oscillator,
     effects,
-    channelKey: asString(modulator.data.channelKey, 'mag'),
-    targetParam: asString(modulator.data.targetParam, 'frequencyHz'),
+    channelKey,
+    targetParam,
     inMin: asNumber(modulator.data.inMin, 0),
     inMax: asNumber(modulator.data.inMax, 1),
     outMin: asNumber(modulator.data.outMin, 0),
@@ -222,8 +227,10 @@ export function findCompleteModulationChains(
     if (!connector) continue;
     const paths = effectPathsFromModulatorToOscillator(node.id, oscillatorId, byId, edges);
     if (paths.length === 0) continue;
+    const chain = modulationFrom(connector, node, oscillator, paths[0]!);
+    if (!chain) continue;
     seenModulators.add(node.id);
-    chains.push(modulationFrom(connector, node, oscillator, paths[0]!));
+    chains.push(chain);
   }
 
   return chains;

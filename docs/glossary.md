@@ -56,4 +56,4 @@ Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with
 
 Scale Snap Effect defaults are tonic `C`, scale `major`, enabled on, and A4 at `440` Hz. Catalog scales are major, natural minor, major pentatonic, and minor pentatonic.
 
-Modulator defaults map `mag` to `frequencyHz` with in range 1 to 8 and out ratio range 0.5× to 4× of the Oscillator base frequency.
+A new Modulator starts with empty channel and target keys. Wiring a Connector fills the first modulatable Channel and its in-range hints when the current Channel is empty or missing on that kind. Wiring through to an Oscillator (Effects allowed in between) fills the first modulatable target param and its out-range the same way. Catalog `modulatorDefaults` still describe the USGS magnitude-to-frequency example ranges.
