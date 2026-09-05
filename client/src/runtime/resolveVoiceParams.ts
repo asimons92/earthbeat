@@ -11,7 +11,7 @@ import {
 } from './channelFromSample';
 import { applyScaleSnapChain, MIN_AUDIBLE_HZ } from './scaleSnap';
 
-export type { ConnectorSample, NoaaConnectorSample, UsgsConnectorSample } from './channelFromSample';
+export type { ConnectorSample, NoaaConnectorSample, NdbcWaveConnectorSample, UsgsConnectorSample } from './channelFromSample';
 export { channelFromSample } from './channelFromSample';
 
 /** Legacy USGS sample without kindKey; normalize to UsgsConnectorSample. */
@@ -48,7 +48,11 @@ export function modulateFrequencyFromBase(
 
 function normalizeSample(sample: ConnectorSample | EarthquakeSample | null): ConnectorSample | null {
   if (!sample) return null;
-  if (sample.kindKey === 'noaa_coops_tides' || sample.kindKey === 'usgs_earthquakes') {
+  if (
+    sample.kindKey === 'noaa_coops_tides' ||
+    sample.kindKey === 'usgs_earthquakes' ||
+    sample.kindKey === 'ndbc_buoy_waves'
+  ) {
     return sample as ConnectorSample;
   }
   return {
@@ -70,7 +74,8 @@ function samplesMapFrom(
   const looksLikeSingleSample =
     typeof asRecord.id === 'string' &&
     !('usgs_earthquakes' in asRecord) &&
-    !('noaa_coops_tides' in asRecord);
+    !('noaa_coops_tides' in asRecord) &&
+    !('ndbc_buoy_waves' in asRecord);
   if (looksLikeSingleSample) {
     const normalized = normalizeSample(sampleOrMap as ConnectorSample | EarthquakeSample);
     if (!normalized) return {};

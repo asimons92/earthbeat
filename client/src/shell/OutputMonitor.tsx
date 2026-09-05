@@ -45,6 +45,10 @@ function readoutSecondary(
       parts.push(sample.place || label);
     } else if (sample.kindKey === 'noaa_coops_tides' && sample.waterLevel != null) {
       parts.push(`${label} ${sample.waterLevel.toFixed(2)} m`);
+    } else if (sample.kindKey === 'ndbc_buoy_waves' && sample.waveHeight != null) {
+      const period =
+        sample.wavePeriod != null ? ` · ${sample.wavePeriod.toFixed(1)} s` : '';
+      parts.push(`${label} ${sample.waveHeight.toFixed(2)} m${period}`);
     } else {
       parts.push(label);
     }

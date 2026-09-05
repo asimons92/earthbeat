@@ -113,6 +113,59 @@ export const connectorKinds = [
         "modulatable": false
       }
     ]
+  },
+  {
+    "key": "ndbc_buoy_waves",
+    "label": "NDBC Waves",
+    "description": "NDBC standard meteorological realtime2 file (WVHT and DPD). Default buoy is San Francisco 46026. Server polls about every thirty minutes and scrubs a 48h window into a ~90s loop.",
+    "feedUrl": "https://www.ndbc.noaa.gov/data/realtime2/46026.txt",
+    "defaultPollIntervalMs": 1800000,
+    "defaultPlaybackHz": 1,
+    "defaultConfig": {
+      "station": "46026",
+      "interpolate": true
+    },
+    "channels": [
+      {
+        "key": "waveHeight",
+        "label": "Wave height",
+        "unit": "m",
+        "valueType": "number",
+        "source": "WVHT",
+        "modulatable": true,
+        "min": 0,
+        "max": 10,
+        "mapHintMin": 0.5,
+        "mapHintMax": 5
+      },
+      {
+        "key": "wavePeriod",
+        "label": "Wave period",
+        "unit": "s",
+        "valueType": "number",
+        "source": "DPD",
+        "modulatable": true,
+        "min": 2,
+        "max": 20,
+        "mapHintMin": 4,
+        "mapHintMax": 16
+      },
+      {
+        "key": "time",
+        "label": "Observation time",
+        "valueType": "timestamp",
+        "source": "YY MM DD hh mm",
+        "modulatable": false,
+        "description": "NDBC observation timestamp (UTC)"
+      },
+      {
+        "key": "stationId",
+        "label": "Station id",
+        "valueType": "string",
+        "source": "station",
+        "modulatable": false
+      }
+    ]
   }
 ] as const;
 
@@ -121,6 +174,8 @@ export const connectorKindsByKey = {
   'usgs_earthquakes': connectorKinds[0],
 
   'noaa_coops_tides': connectorKinds[1],
+
+  'ndbc_buoy_waves': connectorKinds[2],
 
 } as const;
 

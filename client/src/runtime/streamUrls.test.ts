@@ -7,18 +7,24 @@ import {
   streamUrlsForKindKeys,
 } from './streamUrls';
 
-const knownKindArb = fc.constantFrom('usgs_earthquakes', 'noaa_coops_tides');
+const knownKindArb = fc.constantFrom(
+  'usgs_earthquakes',
+  'noaa_coops_tides',
+  'ndbc_buoy_waves',
+);
+
+const pathByKind: Record<string, string> = {
+  usgs_earthquakes: '/api/earthquakes/stream',
+  noaa_coops_tides: '/api/tides/stream',
+  ndbc_buoy_waves: '/api/waves/stream',
+};
 
 describe('streamUrls', () => {
   it('maps known kinds to dedicated SSE paths', () => {
     fc.assert(
       fc.property(knownKindArb, (kind) => {
         const url = streamUrlForKind(kind);
-        const expected =
-          kind === 'usgs_earthquakes'
-            ? '/api/earthquakes/stream'
-            : '/api/tides/stream';
-        expect(url).toBe(expected);
+        expect(url).toBe(pathByKind[kind]);
       }),
     );
   });
@@ -27,7 +33,10 @@ describe('streamUrls', () => {
     fc.assert(
       fc.property(
         fc.stringMatching(/^[a-z][a-z0-9_]{0,20}$/).filter(
-          (key) => key !== 'usgs_earthquakes' && key !== 'noaa_coops_tides',
+          (key) =>
+            key !== 'usgs_earthquakes' &&
+            key !== 'noaa_coops_tides' &&
+            key !== 'ndbc_buoy_waves',
         ),
         (key) => {
           const absent = undefined;
@@ -42,7 +51,7 @@ describe('streamUrls', () => {
       fc.property(
         fc.uniqueArray(knownKindArb, {
           minLength: 0,
-          maxLength: 2,
+          maxLength: 3,
         }),
         (keys) => {
           const nodes: Array<{

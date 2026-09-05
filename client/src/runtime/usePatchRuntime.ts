@@ -42,7 +42,11 @@ const RECONNECT_MAX_MS = 15000;
 function isConnectorSample(value: unknown): value is ConnectorSample {
   if (!value || typeof value !== 'object') return false;
   const kindKey = (value as { kindKey?: unknown }).kindKey;
-  return kindKey === 'usgs_earthquakes' || kindKey === 'noaa_coops_tides';
+  return (
+    kindKey === 'usgs_earthquakes' ||
+    kindKey === 'noaa_coops_tides' ||
+    kindKey === 'ndbc_buoy_waves'
+  );
 }
 
 export function usePatchRuntime(nodes: Node[], edges: Edge[]) {

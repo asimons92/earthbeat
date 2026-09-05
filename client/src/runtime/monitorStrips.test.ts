@@ -48,7 +48,7 @@ function stripKey(kindKey: string, channelKey: string): string {
 }
 
 const mappingArb = fc.record({
-  channelKey: fc.constantFrom('mag', 'depthKm', 'sig', 'waterLevel'),
+  channelKey: fc.constantFrom('mag', 'depthKm', 'sig', 'waterLevel', 'waveHeight', 'wavePeriod'),
   targetParam: fc.constantFrom('frequencyHz', 'gain'),
   inMin: fc.double({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true }),
   inMax: fc.double({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true }),
@@ -56,7 +56,7 @@ const mappingArb = fc.record({
   outMax: fc.double({ min: -1000, max: 1000, noNaN: true, noDefaultInfinity: true }),
 });
 
-const kindArb = fc.constantFrom('usgs_earthquakes', 'noaa_coops_tides');
+const kindArb = fc.constantFrom('usgs_earthquakes', 'noaa_coops_tides', 'ndbc_buoy_waves');
 
 describe('listMonitorStrips', () => {
   it('never includes incomplete chains', () => {

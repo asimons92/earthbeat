@@ -3,6 +3,7 @@
 const STREAM_BY_KIND: Record<string, string> = {
   usgs_earthquakes: '/api/earthquakes/stream',
   noaa_coops_tides: '/api/tides/stream',
+  ndbc_buoy_waves: '/api/waves/stream',
 };
 
 export function streamUrlForKind(kindKey: string): string | undefined {

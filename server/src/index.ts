@@ -21,11 +21,17 @@ import {
 } from './sseConnectionGate.js';
 import { classifyRequestPath, resolveClientDistDir } from './staticSite.js';
 import { TideStream, type TideSample } from './tideStream.js';
+import { WaveStream, type WaveSample } from './waveStream.js';
 import {
   DEFAULT_LOOP_SECONDS,
   DEFAULT_PLAYBACK_HZ as TIDE_PLAYBACK_HZ,
   DEFAULT_POLL_INTERVAL_MS as TIDE_POLL_INTERVAL_MS,
 } from './noaaCoops.js';
+import {
+  DEFAULT_LOOP_SECONDS as WAVE_LOOP_SECONDS,
+  DEFAULT_PLAYBACK_HZ as WAVE_PLAYBACK_HZ,
+  DEFAULT_POLL_INTERVAL_MS as WAVE_POLL_INTERVAL_MS,
+} from './ndbcBuoy.js';
 import { DEFAULT_PLAYBACK_HZ, DEFAULT_POLL_INTERVAL_MS } from './usgs.js';
 
 const app = express();
@@ -87,12 +93,22 @@ const tideStream = new TideStream({
   loopSeconds: DEFAULT_LOOP_SECONDS,
 });
 
+const waveStream = new WaveStream({
+  hz: WAVE_PLAYBACK_HZ,
+  pollIntervalMs: WAVE_POLL_INTERVAL_MS,
+  loopSeconds: WAVE_LOOP_SECONDS,
+});
+
 earthquakeStream.on('error', (error) => {
   console.error('Earthquake stream error:', error);
 });
 
 tideStream.on('error', (error) => {
   console.error('Tide stream error:', error);
+});
+
+waveStream.on('error', (error) => {
+  console.error('Wave stream error:', error);
 });
 
 app.get('/api/earthquakes/stream', (req: Request, res: Response) => {
@@ -141,6 +157,29 @@ app.get('/api/tides/stream', (req: Request, res: Response) => {
   });
 });
 
+app.get('/api/waves/stream', (req: Request, res: Response) => {
+  if (!sseGate.tryAcquire()) {
+    res.status(503).json({ error: 'Wave stream connection limit reached' });
+    return;
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const onSample = (sample: WaveSample) => {
+    res.write(`data: ${JSON.stringify(sample)}\n\n`);
+  };
+
+  waveStream.on('sample', onSample);
+
+  req.on('close', () => {
+    waveStream.off('sample', onSample);
+    sseGate.release();
+  });
+});
+
 const clientDist = resolveClientDistDir(process.env, process.cwd());
 if (clientDist) {
   app.use(express.static(clientDist));
@@ -161,6 +200,7 @@ async function main() {
   }
   await earthquakeStream.start();
   await tideStream.start();
+  await waveStream.start();
   app.listen(port, () => {
     const site = clientDist ? ` static=${clientDist}` : '';
     console.log(`Earthbeat server on http://localhost:${port} (auth=${getAuthMode()}${site})`);

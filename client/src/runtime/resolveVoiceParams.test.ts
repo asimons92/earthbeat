@@ -185,8 +185,16 @@ describe('resolveVoiceParams', () => {
           waterLevel: fc.option(fc.double({ min: -2, max: 4, noNaN: true }), { nil: null }),
           time: fc.integer({ min: 0, max: 2_000_000_000_000 }),
         }),
+        fc.record({
+          kindKey: fc.constant('ndbc_buoy_waves' as const),
+          id: fc.string({ minLength: 1, maxLength: 12 }),
+          stationId: fc.stringMatching(/^[0-9]{5}$/),
+          waveHeight: fc.option(fc.double({ min: 0, max: 10, noNaN: true }), { nil: null }),
+          wavePeriod: fc.option(fc.double({ min: 2, max: 20, noNaN: true }), { nil: null }),
+          time: fc.integer({ min: 0, max: 2_000_000_000_000 }),
+        }),
         audioHz,
-        (connId, modId, oscId, usgsSample, noaaSample, restingFreq) => {
+        (connId, modId, oscId, usgsSample, noaaSample, waveSample, restingFreq) => {
           fc.pre(new Set([connId, modId, oscId]).size === 3);
           const restingGain = 0.2;
           const nodes: RuntimeNode[] = [
@@ -215,11 +223,78 @@ describe('resolveVoiceParams', () => {
           ];
           const withUsgs = resolveVoiceParams(nodes, edges, oscId, usgsSample);
           const withNoaa = resolveVoiceParams(nodes, edges, oscId, noaaSample);
+          const withWaves = resolveVoiceParams(nodes, edges, oscId, waveSample);
           const resting = false;
           expect(withNoaa.frequencyHz).toBe(restingFreq);
           expect(withNoaa.modulated).toBe(resting);
+          expect(withWaves.frequencyHz).toBe(restingFreq);
+          expect(withWaves.modulated).toBe(resting);
           expect(withUsgs.frequencyHz).toBe(
             modulateFrequencyFromBase(usgsSample.mag, 1, 8, 0.5, 4, restingFreq),
+          );
+        },
+      ),
+    );
+  });
+
+  it('modulates only from matching ndbc_buoy_waves samples', () => {
+    fc.assert(
+      fc.property(
+        idArb,
+        idArb,
+        idArb,
+        fc.record({
+          kindKey: fc.constant('ndbc_buoy_waves' as const),
+          id: fc.string({ minLength: 1, maxLength: 12 }),
+          stationId: fc.stringMatching(/^[0-9]{5}$/),
+          waveHeight: fc.option(fc.double({ min: 0, max: 10, noNaN: true }), { nil: null }),
+          wavePeriod: fc.option(fc.double({ min: 2, max: 20, noNaN: true }), { nil: null }),
+          time: fc.integer({ min: 0, max: 2_000_000_000_000 }),
+        }),
+        sampleArb,
+        audioHz,
+        (connId, modId, oscId, waveSample, usgsSample, restingFreq) => {
+          fc.pre(new Set([connId, modId, oscId]).size === 3);
+          const inMin = 0.5;
+          const inMax = 5;
+          const outMin = 0.5;
+          const outMax = 4;
+          const nodes: RuntimeNode[] = [
+            { id: connId, type: 'connector', data: { kindKey: 'ndbc_buoy_waves' } },
+            {
+              id: modId,
+              type: 'modulator',
+              data: {
+                channelKey: 'waveHeight',
+                targetParam: 'frequencyHz',
+                inMin,
+                inMax,
+                outMin,
+                outMax,
+              },
+            },
+            {
+              id: oscId,
+              type: 'oscillator',
+              data: { frequencyHz: restingFreq, gain: 0.2, waveform: 'sine' },
+            },
+          ];
+          const edges: RuntimeEdge[] = [
+            { id: 'a', source: connId, target: modId },
+            { id: 'b', source: modId, target: oscId },
+          ];
+          const withWave = resolveVoiceParams(nodes, edges, oscId, waveSample);
+          const withUsgs = resolveVoiceParams(nodes, edges, oscId, usgsSample);
+          expect(withUsgs.frequencyHz).toBe(restingFreq);
+          expect(withWave.frequencyHz).toBe(
+            modulateFrequencyFromBase(
+              waveSample.waveHeight,
+              inMin,
+              inMax,
+              outMin,
+              outMax,
+              restingFreq,
+            ),
           );
         },
       ),

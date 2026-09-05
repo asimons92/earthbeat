@@ -304,7 +304,8 @@ export function NodeInspector({
       interpolate?: boolean;
     };
     const kind = getConnectorKind(data.kindKey) ?? usgsConnector;
-    const isNoaa = data.kindKey === 'noaa_coops_tides';
+    const supportsInterpolate =
+      data.kindKey === 'noaa_coops_tides' || data.kindKey === 'ndbc_buoy_waves';
     const interpolate = data.interpolate !== false;
     return (
       <aside className="shell__inspector" aria-label="Node inspector">
@@ -314,7 +315,7 @@ export function NodeInspector({
           <Label>Connector kind</Label>
           <p className="inspector__readonly">{kind.label}</p>
         </div>
-        {isNoaa ? (
+        {supportsInterpolate ? (
           <div className="inspector__field">
             <Label htmlFor="connector-interpolate">Smooth interpolate</Label>
             <label className="inspector__check" htmlFor="connector-interpolate">
@@ -329,7 +330,7 @@ export function NodeInspector({
                   });
                 }}
               />
-              <span>Lerp between tide points while scrubbing</span>
+              <span>Lerp between scrub points while playing</span>
             </label>
           </div>
         ) : null}
