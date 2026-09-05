@@ -1,7 +1,9 @@
 import 'dotenv/config';
+import path from 'node:path';
+
 import * as trpcExpress from '@trpc/server/adapters/express';
 import cors from 'cors';
-import express, { type Request, type Response } from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 
 import {
   bootstrapLocalSession,
@@ -12,6 +14,7 @@ import {
 import { EarthquakeStream, type EarthquakeSample } from './earthquakeStream.js';
 import { appRouter } from './generated/router.js';
 import { ensureSchema } from './migrate.js';
+import { classifyRequestPath, resolveClientDistDir } from './staticSite.js';
 import { DEFAULT_PLAYBACK_HZ, DEFAULT_POLL_INTERVAL_MS } from './usgs.js';
 
 const app = express();
@@ -85,6 +88,18 @@ app.get('/api/earthquakes/stream', (req: Request, res: Response) => {
   });
 });
 
+const clientDist = resolveClientDistDir(process.env, process.cwd());
+if (clientDist) {
+  app.use(express.static(clientDist));
+  app.get('/{*splat}', (req: Request, res: Response, next: NextFunction) => {
+    if (classifyRequestPath(req.path) === 'api') {
+      next();
+      return;
+    }
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
+
 async function main() {
   await ensureSchema();
   if (getAuthMode() !== 'google') {
@@ -92,7 +107,8 @@ async function main() {
   }
   await earthquakeStream.start();
   app.listen(port, () => {
-    console.log(`Earthbeat server on http://localhost:${port} (auth=${getAuthMode()})`);
+    const site = clientDist ? ` static=${clientDist}` : '';
+    console.log(`Earthbeat server on http://localhost:${port} (auth=${getAuthMode()}${site})`);
   });
 }
 
