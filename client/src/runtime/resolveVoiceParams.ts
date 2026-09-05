@@ -1,4 +1,4 @@
-import { mapChannelOrRest } from './mapRange';
+import { mapChannelOrRest, mapRange } from './mapRange';
 import { findModulationChain, type RuntimeEdge, type RuntimeNode } from './modulationChain';
 
 export type EarthquakeSample = {
@@ -16,11 +16,33 @@ export type VoiceParams = {
   modulated: boolean;
 };
 
+const MIN_AUDIBLE_HZ = 20;
+
 function channelFromSample(sample: EarthquakeSample, channelKey: string): number | null {
   if (channelKey === 'mag') return sample.mag;
   if (channelKey === 'depthKm') return sample.depthKm;
   if (channelKey === 'sig') return sample.sig;
   return null;
+}
+
+/**
+ * Map a channel onto absolute outMin/outMax, then recenter so the Oscillator
+ * frequencyHz is the audible base (midpoint of the Modulator out range).
+ */
+export function modulateFrequencyFromBase(
+  channelValue: number | null | undefined,
+  inMin: number,
+  inMax: number,
+  outMin: number,
+  outMax: number,
+  baseFrequencyHz: number,
+): number {
+  if (channelValue === null || channelValue === undefined || Number.isNaN(channelValue)) {
+    return baseFrequencyHz;
+  }
+  const mapped = mapRange(channelValue, inMin, inMax, outMin, outMax);
+  const mid = (outMin + outMax) / 2;
+  return Math.max(MIN_AUDIBLE_HZ, baseFrequencyHz + (mapped - mid));
 }
 
 export function resolveVoiceParams(
@@ -40,18 +62,27 @@ export function resolveVoiceParams(
   }
 
   const channelValue = channelFromSample(sample, chain.channelKey);
-  const mapped = mapChannelOrRest(
+
+  if (chain.targetParam === 'gain') {
+    const mappedGain = mapChannelOrRest(
+      channelValue,
+      chain.inMin,
+      chain.inMax,
+      chain.outMin,
+      chain.outMax,
+      restingGain,
+    );
+    return { frequencyHz: restingFreq, gain: mappedGain, modulated: true };
+  }
+
+  const frequencyHz = modulateFrequencyFromBase(
     channelValue,
     chain.inMin,
     chain.inMax,
     chain.outMin,
     chain.outMax,
-    chain.targetParam === 'gain' ? restingGain : restingFreq,
+    restingFreq,
   );
 
-  if (chain.targetParam === 'gain') {
-    return { frequencyHz: restingFreq, gain: mapped, modulated: true };
-  }
-
-  return { frequencyHz: mapped, gain: restingGain, modulated: true };
+  return { frequencyHz, gain: restingGain, modulated: true };
 }
