@@ -23,6 +23,7 @@ import {
   type SampleHistoryState,
 } from './sampleHistory';
 import { planVoiceCleanup } from './voiceCleanup';
+import { planVoiceParamApply } from './voiceParamApply';
 import {
   canApplyVoice,
   filterLiveApplyTargets,
@@ -135,8 +136,11 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         await engine.removeVoice(oscillatorId);
         continue;
       }
-      await voice.setFrequency(params.frequencyHz);
-      await voice.setGain(params.gain);
+      const applyPlan = planVoiceParamApply(waveform, params.frequencyHz, params.gain);
+      if (applyPlan.frequencyHz !== null) {
+        await voice.setFrequency(applyPlan.frequencyHz);
+      }
+      await voice.setGain(applyPlan.gain);
       if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) {
         await engine.removeVoice(oscillatorId);
         continue;

@@ -6,6 +6,7 @@ import type { AudioFxStep } from './audioFxChain';
 import {
   buildOscillatorTone,
   OSCILLATOR_WAVEFORM_KEYS,
+  oscillatorWaveformUsesFrequency,
   planVoiceEnsure,
   resolveOscillatorWaveform,
 } from './oscillatorTone';
@@ -103,6 +104,8 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
 
     const controls: VoiceControls = {
       setFrequency: async (freqHz) => {
+        // Noise (and other unpitched tones) never mount the frequency ref.
+        if (!oscillatorWaveformUsesFrequency(resolvedWaveform)) return;
         await setFreqProps({ value: freqHz });
       },
       setGain: async (nextGain) => {
