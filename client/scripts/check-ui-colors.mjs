@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Ban raw colors in TS/TSX so UI stays on CSS tokens.
- * Allowed: CSS var(...) references, currentColor, transparent, inherit, none.
+ * Ban raw colors and Tailwind palette utilities in TS/TSX.
+ * Colors belong in src/styles/tokens.css; classes should be semantic tokens.
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -14,10 +14,12 @@ const SRC = path.resolve(__dirname, '../src');
 const HEX = /#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/;
 const COLOR_FN =
   /\b(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color|color-mix)\s*\(/i;
-const NAMED =
-  /\b(?:aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkgrey|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkslategrey|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dimgrey|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|grey|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightgrey|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightslategrey|lightsteelblue|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|rebeccapurple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|slategrey|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen)\b/i;
-
-const ALLOWED_NAMED = new Set(['transparent', 'currentcolor', 'inherit', 'initial', 'unset', 'none']);
+const ARBITRARY_COLOR =
+  /\b(?:bg|text|border|ring|outline|fill|stroke|from|to|via|divide|decoration|accent|caret|shadow)-\[(?:#|rgb|hsl|oklch|oklab|lab|lch)/i;
+const PALETTE =
+  /\b(?:bg|text|border|ring|outline|fill|stroke|from|to|via|divide|decoration|accent|caret|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)(?:-\d{2,3})?(?:\/[\d.]+)?\b/;
+const BARE =
+  /\b(?:bg|text|border|ring|outline|fill|stroke)-(?:white|black)(?:\/[\d.]+)?\b/;
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -31,10 +33,6 @@ async function walk(dir) {
     }
   }
   return files;
-}
-
-function lineOf(source, index) {
-  return source.slice(0, index).split('\n').length;
 }
 
 function checkFile(file, source) {
@@ -64,29 +62,27 @@ function checkFile(file, source) {
       });
     }
 
-    // Only flag named colors in style-ish contexts to reduce false positives.
-    if (/style\s*=|color\s*:|stroke\s*=|fill\s*=|background/i.test(line)) {
-      for (const match of line.matchAll(new RegExp(NAMED, 'gi'))) {
-        if (ALLOWED_NAMED.has(match[0].toLowerCase())) continue;
-        findings.push({
-          file,
-          line: i + 1,
-          message: `named color "${match[0]}" — use a CSS token`,
-        });
-      }
-    }
-  }
-
-  // Catch template/string hexes that may span odd formatting
-  let m;
-  const hexGlobal = new RegExp(HEX, 'g');
-  while ((m = hexGlobal.exec(source))) {
-    const already = findings.some((f) => f.line === lineOf(source, m.index) && f.message.includes(m[0]));
-    if (!already) {
+    for (const match of line.matchAll(new RegExp(ARBITRARY_COLOR, 'g'))) {
       findings.push({
         file,
-        line: lineOf(source, m.index),
-        message: `raw hex color "${m[0]}" — use a CSS token (var(--…))`,
+        line: i + 1,
+        message: `arbitrary Tailwind color "${match[0]}" — use a semantic token class`,
+      });
+    }
+
+    for (const match of line.matchAll(new RegExp(PALETTE, 'g'))) {
+      findings.push({
+        file,
+        line: i + 1,
+        message: `palette utility "${match[0]}" — use semantic tokens (bg-background, text-foreground, …)`,
+      });
+    }
+
+    for (const match of line.matchAll(new RegExp(BARE, 'g'))) {
+      findings.push({
+        file,
+        line: i + 1,
+        message: `bare color utility "${match[0]}" — use bg-background / text-foreground / border-border`,
       });
     }
   }
@@ -105,7 +101,9 @@ if (all.length) {
   for (const f of all) {
     console.error(`${path.relative(process.cwd(), f.file)}:${f.line}: ${f.message}`);
   }
-  console.error(`\ncheck-ui-colors: ${all.length} violation(s). Define colors in src/styles/tokens.css only.`);
+  console.error(
+    `\ncheck-ui-colors: ${all.length} violation(s). Define colors in src/styles/tokens.css only.`,
+  );
   process.exit(1);
 }
 

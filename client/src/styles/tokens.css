@@ -1,24 +1,24 @@
 /**
  * Earthbeat design tokens — only file allowed to define raw colors.
- * Everywhere else must use var(--token-name).
+ * shadcn semantic names are bridged here so Tailwind utilities stay on-token.
  */
 
 :root {
-  /* Surfaces */
+  /* Earthbeat surfaces */
   --bg: #f7f4ee;
   --bg-panel: #f1eee6;
   --bg-node: #fff;
 
-  /* Ink / lines */
+  /* Earthbeat ink / lines */
   --ink: #121212;
   --ink-muted: #5c5c5c;
   --line: #121212;
   --line-muted: #cfcbc3;
   --grid-dot: #cfcbc3;
 
-  /* Semantic accents (use sparingly) */
+  /* Accents */
   --live: #c43c3c;
-  --destructive: #c43c3c;
+  --danger: #c43c3c;
 
   /* Type */
   --font-ui: 'DM Sans', sans-serif;
@@ -27,4 +27,37 @@
   /* Geometry */
   --radius: 6px;
   --radius-node: 10px;
+
+  /* shadcn / Tailwind semantic bridge */
+  --background: #f7f4ee;
+  --foreground: #121212;
+  --card: #fff;
+  --card-foreground: #121212;
+  --popover: #fff;
+  --popover-foreground: #121212;
+  --primary: #121212;
+  --primary-foreground: #f7f4ee;
+  --secondary: #f1eee6;
+  --secondary-foreground: #121212;
+  --muted: #f1eee6;
+  --muted-foreground: #5c5c5c;
+  --accent: #f1eee6;
+  --accent-foreground: #121212;
+  --destructive: #c43c3c;
+  --border: #121212;
+  --input: #121212;
+  --ring: #121212;
+  --chart-1: #121212;
+  --chart-2: #5c5c5c;
+  --chart-3: #cfcbc3;
+  --chart-4: #f1eee6;
+  --chart-5: #c43c3c;
+  --sidebar: #f1eee6;
+  --sidebar-foreground: #121212;
+  --sidebar-primary: #121212;
+  --sidebar-primary-foreground: #f7f4ee;
+  --sidebar-accent: #f7f4ee;
+  --sidebar-accent-foreground: #121212;
+  --sidebar-border: #121212;
+  --sidebar-ring: #121212;
 }

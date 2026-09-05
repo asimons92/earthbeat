@@ -8,6 +8,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import { Button } from '@/components/ui/button';
 import { demoModulation, oscillatorDefaults, usgsConnector } from './catalog';
 import { ModulationEdge } from './edges/ModulationEdge';
 import { ConnectionNode } from './nodes/ConnectionNode';
@@ -105,12 +106,12 @@ export default function App() {
           </select>
         </label>
         <div className="shell__transport">
-          <button type="button" className="transport-btn" onClick={onPlay} aria-label="Play">
+          <Button type="button" variant="outline" size="icon" onClick={onPlay} aria-label="Play">
             ▶
-          </button>
-          <button type="button" className="transport-btn" onClick={onStop} aria-label="Stop">
+          </Button>
+          <Button type="button" variant="outline" size="icon" onClick={onStop} aria-label="Stop">
             ■
-          </button>
+          </Button>
           <span className="live-badge" title="Live feed not connected yet">
             <span className="live-badge__dot" />
             LIVE

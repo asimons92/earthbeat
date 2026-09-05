@@ -1,5 +1,5 @@
 ---
-description: Eggshell/black UI tokens — no raw colors or vibe styling
+description: Eggshell/black UI tokens — Tailwind/shadcn semantic colors only
 globs: client/**/*.{css,tsx,ts,jsx,js}
 alwaysApply: false
 ---
@@ -11,21 +11,23 @@ Visual source of truth: `docs/earthbeat-ui-eggshell-minimal.png` and `docs/ui-co
 ## Colors
 
 - Define raw colors only in `client/src/styles/tokens.css`
-- In other CSS/TSX, use `var(--token)`, `currentColor`, or `transparent`
-- Never add hex, `rgb()`, `hsl()`, or `color-mix()` outside tokens
-- Accents: `--live` / `--destructive` only — no decorative palette
+- In CSS/TSX use `var(--token)` or Tailwind **semantic** classes (`bg-background`, `text-foreground`, `border-border`, …)
+- Never add hex, `rgb()`, `hsl()`, `oklch()`, or `color-mix()` outside tokens
+- Never use Tailwind palette classes (`bg-zinc-100`, `text-blue-500`) or arbitrary colors (`bg-[#…]`)
+- Accents: live / destructive only
 
 ## Look
 
 - Eggshell ground, plain black hairlines, flat fills
 - No soft shadows, glows, gradients, glass, or neumorphism
-- No “synth dashboard” chrome (colored knobs, skeuomorphic aluminum)
+- Keep DM Sans / Syne — do not reintroduce Geist or preset marketing fonts
 
 ## Components
 
-- Prefer existing shell class patterns in `client/src/index.css`
-- When adding Tailwind/shadcn later, map to the same tokens; never use raw palette classes
+- Prefer shadcn primitives in `client/src/components/ui`
+- Add with `pnpm dlx shadcn@latest add <name>`
+- Shell layout may still use `index.css` BEM classes; new controls should use tokens/shadcn
 
 ## Verify
 
-Run `pnpm --dir client lint` after UI changes (oxlint + stylelint + check-ui-colors).
+Run `pnpm --dir client lint` after UI changes.
