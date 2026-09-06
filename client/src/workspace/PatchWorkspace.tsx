@@ -27,12 +27,14 @@ import {
   type ModulatorChannelOption,
   type ModulatorTargetOption,
 } from '@/catalog/modulatorMapping';
+import { oscillatorLabel } from '@/catalog/oscillatorLabel';
 import {
   connectorKindsByKey,
   effectKindsByKey,
   modulatableChannelsForKind,
   oscillatorDefaults,
   oscillatorModulatableParams,
+  oscillatorWaveforms,
 } from '@/generated/catalog';
 import { usePatchPersist } from '@/persist/usePatchPersist';
 import { usePatchRuntime } from '@/runtime/usePatchRuntime';
@@ -324,7 +326,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
         type: 'oscillator',
         position,
         data: {
-          label: index === 0 ? 'Sine Tone' : `Sine Tone ${index + 1}`,
+          label: oscillatorLabel(oscillatorDefaults.waveform, oscillatorWaveforms, index),
           waveform: oscillatorDefaults.waveform,
           frequencyHz: oscillatorDefaults.frequencyHz,
           gain: oscillatorDefaults.gain,

@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { Button } from '@/components/ui/button';
 import { effectStatusLine } from '@/catalog/buildEffectNode';
+import { oscillatorLabel } from '@/catalog/oscillatorLabel';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -545,6 +546,7 @@ export function NodeInspector({
               onChangeNodeData(selected.id, {
                 ...data,
                 waveform: value,
+                label: oscillatorLabel(value, oscillatorWaveforms),
                 frequencyHz,
                 gain,
                 status: `${frequencyHz} Hz`,
