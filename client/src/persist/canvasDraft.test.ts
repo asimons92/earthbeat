@@ -41,6 +41,7 @@ const versionArb = fc.integer({ min: 1, max: 10_000 });
 const writeReasonArb = fc.constantFrom<GraphWriteReason>('edit', 'save', 'saveAs', 'autosave');
 const sourceEventArb = fc.constantFrom<WorkingGraphSourceEvent>(
   'libraryOpen',
+  'starterOpen',
   'refresh',
   'coldStart',
   'new',
@@ -97,6 +98,14 @@ const persistEventArb: fc.Arbitrary<CanvasPersistEvent> = fc.oneof(
   fc.constant({ type: 'save' as const }),
   fc.record({ type: fc.constant('saveAs' as const), name: nameArb, newId: idArb }),
   libraryPatchArb.map((patch) => ({ type: 'libraryOpen' as const, patch })),
+  fc
+    .record({
+      name: nameArb,
+      patchVersion: versionArb,
+      nodes: fc.uniqueArray(nodeArb, { minLength: 0, maxLength: 5, selector: (n) => n.id }),
+      edges: fc.uniqueArray(edgeArb, { minLength: 0, maxLength: 5, selector: (e) => e.id }),
+    })
+    .map((snapshot) => ({ type: 'starterOpen' as const, ...snapshot })),
   fc.constant({ type: 'new' as const }),
   fc.constant({ type: 'signOut' as const }),
   idArb.map((userId) => ({ type: 'signIn' as const, userId })),
@@ -110,13 +119,13 @@ function assertLiveMatchesEmpty(state: CanvasPersistState) {
 }
 
 describe('decideCanvasBoot', () => {
-  it('restores a draft when one exists and otherwise starts empty', () => {
+  it('restores a draft when one exists and otherwise loads the starter', () => {
     fc.assert(
       fc.property(fc.boolean(), (draftPresent) => {
         const decision = decideCanvasBoot(draftPresent);
         const expected = draftPresent
           ? ('restoreDraft' as const)
-          : ('empty' as const);
+          : ('starter' as const);
         expect(decision).toBe(expected);
       }),
     );
@@ -164,18 +173,20 @@ describe('shouldWriteGraphToDatabase / decideGraphWriteSink', () => {
 });
 
 describe('decideWorkingGraphSource', () => {
-  it('loads library opens from the database, blanks New and sign-out, and restores drafts on refresh or cold start', () => {
+  it('loads user library from the database, starters from starter, blanks New and sign-out, and uses draft or starter on cold start', () => {
     fc.assert(
       fc.property(sourceEventArb, fc.boolean(), (event, draftPresent) => {
         const source = decideWorkingGraphSource(event, draftPresent);
         const expected =
           event === 'libraryOpen'
             ? ('database' as const)
-            : event === 'new' || event === 'signOut'
-              ? ('empty' as const)
-              : draftPresent
-                ? ('browserDraft' as const)
-                : ('empty' as const);
+            : event === 'starterOpen'
+              ? ('starter' as const)
+              : event === 'new' || event === 'signOut'
+                ? ('empty' as const)
+                : draftPresent
+                  ? ('browserDraft' as const)
+                  : ('starter' as const);
         expect(source).toBe(expected);
       }),
     );
@@ -314,20 +325,21 @@ describe('reduceCanvasPersist model', () => {
     );
   });
 
-  it('restores the stored draft on cold start and refresh, else blanks', () => {
+  it('restores the stored draft on cold start and refresh, else loads the default starter', () => {
     fc.assert(
       fc.property(fc.option(draftPayloadArb, { nil: null }), (draft) => {
         const base: CanvasPersistState = {
           ...initialCanvasPersistState(null),
           draft,
         };
-        const empty = emptyWorkingGraph();
+        const starter = reduceCanvasPersist(initialCanvasPersistState(null), { type: 'coldStart' });
         for (const type of ['coldStart', 'refresh'] as const) {
           const next = reduceCanvasPersist(base, { type });
-          expect(next.liveNodes).toEqual(draft ? draft.nodes : empty.nodes);
-          expect(next.liveEdges).toEqual(draft ? draft.edges : empty.edges);
-          expect(next.activePatchId).toBe(draft ? draft.activePatchId : null);
-          expect(next.isDirty).toBe(draft ? draft.isDirty : emptyCanvasDraftPayload().isDirty);
+          expect(next.liveNodes).toEqual(draft ? draft.nodes : starter.liveNodes);
+          expect(next.liveEdges).toEqual(draft ? draft.edges : starter.liveEdges);
+          expect(next.activePatchId).toBe(draft ? draft.activePatchId : starter.activePatchId);
+          expect(next.activePatchName).toBe(draft ? draft.activePatchName : starter.activePatchName);
+          expect(next.isDirty).toBe(draft ? draft.isDirty : starter.isDirty);
         }
       }),
     );
@@ -520,6 +532,19 @@ describe('reduceCanvasPersist model', () => {
             ).toEqual(event.type === 'libraryOpen' ? event.patch.nodes : null);
             expect(
               event.type === 'libraryOpen' ? state.isDirty : emptyCanvasDraftPayload().isDirty,
+            ).toBe(emptyCanvasDraftPayload().isDirty);
+
+            expect(
+              event.type === 'starterOpen' ? state.activePatchId : 'ok',
+            ).toBe(event.type === 'starterOpen' ? null : 'ok');
+            expect(
+              event.type === 'starterOpen' ? state.activePatchName : 'ok',
+            ).toBe(event.type === 'starterOpen' ? event.name : 'ok');
+            expect(
+              event.type === 'starterOpen' ? state.liveNodes : null,
+            ).toEqual(event.type === 'starterOpen' ? event.nodes : null);
+            expect(
+              event.type === 'starterOpen' ? state.isDirty : emptyCanvasDraftPayload().isDirty,
             ).toBe(emptyCanvasDraftPayload().isDirty);
 
             expect(

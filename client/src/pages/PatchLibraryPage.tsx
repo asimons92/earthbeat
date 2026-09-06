@@ -5,7 +5,15 @@ import { Button } from '@/components/ui/button';
 import { shellPatchFileActions } from '@/generated/catalog';
 import { decideDirtyNavigation } from '@/persist/patchFileActions';
 import { DeletePatchDialog, DiscardChangesDialog } from '@/shell/PatchFileDialogs';
+import {
+  buildPatchLibraryEntries,
+  listStarterPatches,
+} from '@/starters/starterLibrary';
 import { usePatchWorkspace } from '@/workspace/PatchWorkspace';
+
+type PendingOpen =
+  | { kind: 'starter'; key: string }
+  | { kind: 'user'; id: string };
 
 export function PatchLibraryPage() {
   const navigate = useNavigate();
@@ -13,94 +21,153 @@ export function PatchLibraryPage() {
     sessionReady,
     patches,
     loadPatch,
+    loadStarter,
     deletePatch,
     isDirty,
   } = usePatchWorkspace();
 
   const deleteAction = shellPatchFileActions.find((action) => action.key === 'delete');
 
-  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
+  const [pendingOpen, setPendingOpen] = useState<PendingOpen | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     name: string;
     version: number;
   } | null>(null);
 
-  const openPatch = async (id: string) => {
+  const entries = buildPatchLibraryEntries({
+    starters: listStarterPatches().map((starter) => ({
+      key: starter.key,
+      name: starter.name,
+    })),
+    userPatches: sessionReady
+      ? patches.map((patch) => ({
+          id: patch.id,
+          name: patch.name,
+          version: Number(patch.version),
+        }))
+      : null,
+  });
+
+  const starterEntries = entries.filter((entry) => entry.kind === 'starter');
+  const userEntries = entries.filter((entry) => entry.kind === 'user');
+
+  const openStarter = (key: string) => {
+    loadStarter(key);
+    navigate('/');
+  };
+
+  const openUserPatch = async (id: string) => {
     await loadPatch(id);
     navigate('/');
   };
 
-  const onOpenClick = (id: string) => {
+  const onStarterClick = (key: string) => {
     if (decideDirtyNavigation(isDirty, 'load') === 'prompt') {
-      setPendingOpenId(id);
+      setPendingOpen({ kind: 'starter', key });
       return;
     }
-    void openPatch(id);
+    openStarter(key);
   };
 
-  if (!sessionReady) {
-    return (
-      <main className="shell__canvas library">
-        <header className="library__header">
-          <h1 className="library__title">Patch Library</h1>
-          <p className="library__lede">Sign in to list your Patches.</p>
-        </header>
-      </main>
-    );
-  }
+  const onUserClick = (id: string) => {
+    if (decideDirtyNavigation(isDirty, 'load') === 'prompt') {
+      setPendingOpen({ kind: 'user', id });
+      return;
+    }
+    void openUserPatch(id);
+  };
 
   return (
     <main className="shell__canvas library">
       <header className="library__header">
         <h1 className="library__title">Patch Library</h1>
-        <p className="library__lede">Your saved Patches. Open one to edit it on the canvas.</p>
+        <p className="library__lede">
+          {sessionReady
+            ? 'Starters and your saved Patches. Open one to edit it on the canvas.'
+            : 'Starters are open to everyone. Sign in to list and save your own Patches.'}
+        </p>
       </header>
-      {patches.length === 0 ? (
-        <p className="library__empty">No Patches yet. Save one from the canvas.</p>
-      ) : (
+
+      <section className="library__section">
+        <h2 className="library__section-title">Starters</h2>
         <ul className="library__list">
-          {patches.map((patch) => (
-            <li key={patch.id} className="library__row-wrap">
-              <button
-                type="button"
-                className="library__row"
-                onClick={() => {
-                  onOpenClick(patch.id);
-                }}
-              >
-                <span className="library__row-label">{patch.name}</span>
-                <span className="library__row-desc">{patch.id}</span>
-              </button>
-              {deleteAction ? (
-                <Button
+          {starterEntries.map((entry) =>
+            entry.kind === 'starter' ? (
+              <li key={entry.key} className="library__row-wrap">
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  className="library__row-action"
+                  className="library__row"
                   onClick={() => {
-                    setDeleteTarget({
-                      id: patch.id,
-                      name: patch.name,
-                      version: Number(patch.version),
-                    });
+                    onStarterClick(entry.key);
                   }}
                 >
-                  {deleteAction.label}
-                </Button>
-              ) : null}
-            </li>
-          ))}
+                  <span className="library__row-label">{entry.name}</span>
+                  <span className="library__row-desc">{entry.key}</span>
+                </button>
+              </li>
+            ) : null,
+          )}
         </ul>
-      )}
+      </section>
+
+      <section className="library__section">
+        <h2 className="library__section-title">Your Patches</h2>
+        {!sessionReady ? (
+          <p className="library__empty">Sign in to list Patches you own.</p>
+        ) : userEntries.length === 0 ? (
+          <p className="library__empty">No Patches yet. Save one from the canvas.</p>
+        ) : (
+          <ul className="library__list">
+            {userEntries.map((entry) =>
+              entry.kind === 'user' ? (
+                <li key={entry.id} className="library__row-wrap">
+                  <button
+                    type="button"
+                    className="library__row"
+                    onClick={() => {
+                      onUserClick(entry.id);
+                    }}
+                  >
+                    <span className="library__row-label">{entry.name}</span>
+                    <span className="library__row-desc">{entry.id}</span>
+                  </button>
+                  {deleteAction ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="library__row-action"
+                      onClick={() => {
+                        setDeleteTarget({
+                          id: entry.id,
+                          name: entry.name,
+                          version: entry.version,
+                        });
+                      }}
+                    >
+                      {deleteAction.label}
+                    </Button>
+                  ) : null}
+                </li>
+              ) : null,
+            )}
+          </ul>
+        )}
+      </section>
 
       <DiscardChangesDialog
-        open={pendingOpenId !== null}
-        onStay={() => setPendingOpenId(null)}
+        open={pendingOpen !== null}
+        onStay={() => setPendingOpen(null)}
         onDiscard={() => {
-          const id = pendingOpenId;
-          setPendingOpenId(null);
-          if (id) void openPatch(id);
+          const target = pendingOpen;
+          setPendingOpen(null);
+          if (!target) return;
+          if (target.kind === 'starter') {
+            openStarter(target.key);
+            return;
+          }
+          void openUserPatch(target.id);
         }}
       />
 

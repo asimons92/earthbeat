@@ -4,6 +4,7 @@ import { TRPCClientError } from '@trpc/client';
 
 import {
   clearCanvasDraft,
+  decideCanvasBoot,
   readCanvasDraft,
   writeCanvasDraft,
   type CanvasDraftEdge,
@@ -19,6 +20,7 @@ import {
 } from '@/persist/patchPersistRaces';
 import { decideSessionBootstrap } from '@/persist/sessionBootstrap';
 import { domainGraphToFlow, flowToDomainGraph } from '@/persist/graphMapper';
+import { listStarterPatches, starterWorkingSnapshot } from '@/starters/starterLibrary';
 import { trpc } from '@/trpc';
 
 export type PersistStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict' | 'draft_error';
@@ -174,14 +176,50 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     [markClean, markDirty, markProgrammaticGraph, setEdges, setNodes],
   );
 
-  const restoreDraftForUser = useCallback(
+  const applyStarter = useCallback(
+    (starterKey?: string) => {
+      if (shouldBlockCanvasMutation(saveInFlightRef.current)) return;
+      cancelDraftTimer();
+      const starters = listStarterPatches();
+      const starter =
+        typeof starterKey === 'string'
+          ? starters.find((row) => row.key === starterKey)
+          : starters[0];
+      if (!starter) return;
+      const snap = starterWorkingSnapshot(starter);
+      const nextNodes = snap.nodes;
+      const nextEdges = snap.edges;
+      markProgrammaticGraph(nextNodes, nextEdges);
+      setActivePatchId(snap.activePatchId);
+      setActivePatchName(snap.activePatchName);
+      setPatchVersion(snap.patchVersion);
+      markClean();
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      nodesRef.current = nextNodes;
+      edgesRef.current = nextEdges;
+      patchIdRef.current = snap.activePatchId;
+      patchNameRef.current = snap.activePatchName;
+      versionRef.current = snap.patchVersion;
+      flushDraft(false);
+      setPersistStatus('idle');
+    },
+    [cancelDraftTimer, flushDraft, markClean, markProgrammaticGraph, setEdges, setNodes],
+  );
+
+  const bootCanvasForUser = useCallback(
     (userId: string | null) => {
       const draft = readCanvasDraft(userId);
-      if (draft) {
+      const decision = decideCanvasBoot(draft !== null);
+      if (decision === 'restoreDraft' && draft) {
         applyDraft(draft);
+        return;
+      }
+      if (decision === 'starter') {
+        applyStarter();
       }
     },
-    [applyDraft],
+    [applyDraft, applyStarter],
   );
 
   useEffect(() => {
@@ -202,7 +240,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           setSessionReady(false);
           if (!draftBootstrappedRef.current) {
             draftBootstrappedRef.current = true;
-            restoreDraftForUser(null);
+            bootCanvasForUser(null);
           }
           return;
         }
@@ -222,7 +260,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           setSessionReady(true);
           if (!draftBootstrappedRef.current) {
             draftBootstrappedRef.current = true;
-            restoreDraftForUser(userId);
+            bootCanvasForUser(userId);
           }
           return;
         }
@@ -236,7 +274,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
             setSessionReady(false);
             if (!draftBootstrappedRef.current) {
               draftBootstrappedRef.current = true;
-              restoreDraftForUser(null);
+              bootCanvasForUser(null);
             }
             return;
           }
@@ -248,7 +286,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           setSessionReady(true);
           if (!draftBootstrappedRef.current) {
             draftBootstrappedRef.current = true;
-            restoreDraftForUser(userId);
+            bootCanvasForUser(userId);
           }
           return;
         }
@@ -256,18 +294,18 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         setSessionReady(false);
         if (!draftBootstrappedRef.current) {
           draftBootstrappedRef.current = true;
-          restoreDraftForUser(null);
+          bootCanvasForUser(null);
         }
       } catch {
         userIdRef.current = null;
         setSessionReady(false);
         if (!draftBootstrappedRef.current) {
           draftBootstrappedRef.current = true;
-          restoreDraftForUser(null);
+          bootCanvasForUser(null);
         }
       }
     })();
-  }, [restoreDraftForUser]);
+  }, [bootCanvasForUser]);
 
   useEffect(() => {
     const flushOnLeave = () => {
@@ -500,6 +538,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     scheduleDraftPersist,
     createPatch,
     loadPatch,
+    loadStarter: applyStarter,
     newBlankPatch,
     blankForSignOut,
     deletePatch,

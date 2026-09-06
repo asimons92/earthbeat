@@ -1,4 +1,5 @@
 import { BLANK_PATCH_NAME } from '@/persist/patchFileActions';
+import { listStarterPatches, starterWorkingSnapshot } from '@/starters/starterLibrary';
 
 /** Browser draft key when nobody is signed in. */
 export const ANONYMOUS_DRAFT_USER_KEY = 'anonymous';
@@ -23,14 +24,15 @@ export type GraphWriteReason = 'edit' | 'save' | 'saveAs' | 'autosave';
 
 export type WorkingGraphSourceEvent =
   | 'libraryOpen'
+  | 'starterOpen'
   | 'refresh'
   | 'coldStart'
   | 'new'
   | 'signOut';
 
-export type WorkingGraphSource = 'database' | 'browserDraft' | 'empty';
+export type WorkingGraphSource = 'database' | 'browserDraft' | 'empty' | 'starter';
 
-export type CanvasBootDecision = 'restoreDraft' | 'empty';
+export type CanvasBootDecision = 'restoreDraft' | 'empty' | 'starter';
 
 export type LiveCanvasAfterSignOut = 'blank';
 export type DraftStorageAfterSignOut = 'retain';
@@ -70,6 +72,13 @@ export type CanvasPersistEvent =
   | { type: 'save' }
   | { type: 'saveAs'; name: string; newId: string }
   | { type: 'libraryOpen'; patch: LibraryPatchGraph }
+  | {
+      type: 'starterOpen';
+      name: string;
+      patchVersion: number;
+      nodes: ReadonlyArray<CanvasDraftNode>;
+      edges: ReadonlyArray<CanvasDraftEdge>;
+    }
   | { type: 'new' }
   | { type: 'signOut' }
   | { type: 'signIn'; userId: string };
@@ -103,7 +112,7 @@ export function emptyCanvasDraftPayload(): CanvasDraftPayload {
 }
 
 export function decideCanvasBoot(draftPresent: boolean): CanvasBootDecision {
-  return draftPresent ? 'restoreDraft' : 'empty';
+  return draftPresent ? 'restoreDraft' : 'starter';
 }
 
 /** Database receives the graph only for explicit Save / Save As. */
@@ -126,8 +135,9 @@ export function decideWorkingGraphSource(
   draftPresent: boolean,
 ): WorkingGraphSource {
   if (event === 'libraryOpen') return 'database';
+  if (event === 'starterOpen') return 'starter';
   if (event === 'new' || event === 'signOut') return 'empty';
-  return draftPresent ? 'browserDraft' : 'empty';
+  return draftPresent ? 'browserDraft' : 'starter';
 }
 
 export function decideLiveCanvasAfterSignOut(): LiveCanvasAfterSignOut {
@@ -347,6 +357,44 @@ function blankLive(state: CanvasPersistState, clearDraft: boolean): CanvasPersis
   };
 }
 
+function applyStarterLive(
+  state: CanvasPersistState,
+  input: {
+    name: string;
+    patchVersion: number;
+    nodes: ReadonlyArray<CanvasDraftNode>;
+    edges: ReadonlyArray<CanvasDraftEdge>;
+  },
+): CanvasPersistState {
+  const next: CanvasPersistState = {
+    ...state,
+    liveNodes: input.nodes,
+    liveEdges: input.edges,
+    activePatchId: null,
+    activePatchName: input.name,
+    patchVersion: input.patchVersion,
+    isDirty: false,
+    lastDbWriteReason: null,
+    lastBrowserDraftWrite: false,
+  };
+  return {
+    ...next,
+    draft: snapshotDraft(next, false),
+  };
+}
+
+function defaultStarterLive(state: CanvasPersistState): CanvasPersistState {
+  const starter = listStarterPatches()[0];
+  if (!starter) return blankLive(state, false);
+  const snap = starterWorkingSnapshot(starter);
+  return applyStarterLive(state, {
+    name: snap.activePatchName,
+    patchVersion: snap.patchVersion,
+    nodes: snap.nodes as unknown as CanvasDraftNode[],
+    edges: snap.edges as unknown as CanvasDraftEdge[],
+  });
+}
+
 /**
  * Pure model of canvas draft vs database Save.
  * Wiring (localStorage, React Flow, tRPC) stays outside this reducer.
@@ -359,7 +407,7 @@ export function reduceCanvasPersist(
     case 'coldStart':
     case 'refresh': {
       if (state.draft) return restoreFromDraft(state, state.draft);
-      return blankLive(state, false);
+      return defaultStarterLive(state);
     }
     case 'edit': {
       const next: CanvasPersistState = {
@@ -427,6 +475,14 @@ export function reduceCanvasPersist(
         ...next,
         draft: snapshotDraft(next, false),
       };
+    }
+    case 'starterOpen': {
+      return applyStarterLive(state, {
+        name: event.name,
+        patchVersion: event.patchVersion,
+        nodes: event.nodes,
+        edges: event.edges,
+      });
     }
     case 'new': {
       return blankLive(state, decideDraftAfterNew() === 'clear');

@@ -141,6 +141,7 @@ type PatchWorkspaceValue = {
   saveNow: () => Promise<void>;
   createPatch: ReturnType<typeof usePatchPersist>['createPatch'];
   loadPatch: (id: string) => Promise<void>;
+  loadStarter: (key?: string) => void;
   newBlankPatch: () => void;
   blankForSignOut: () => void;
   deletePatch: (id: string, expectedVersion: number) => Promise<{ wasActive: boolean }>;
@@ -168,6 +169,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
   const {
     scheduleDraftPersist,
     loadPatch: persistLoadPatch,
+    loadStarter: persistLoadStarter,
     newBlankPatch: persistNewBlankPatch,
     blankForSignOut: persistBlankForSignOut,
     deletePatch: persistDeletePatch,
@@ -197,6 +199,14 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       await persistLoadPatch(id);
     },
     [persistLoadPatch, resetTransportForPatchLoad],
+  );
+
+  const loadStarter = useCallback(
+    (key?: string) => {
+      resetTransportForPatchLoad();
+      persistLoadStarter(key);
+    },
+    [persistLoadStarter, resetTransportForPatchLoad],
   );
 
   const newBlankPatch = useCallback(() => {
@@ -432,6 +442,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       saveNow: persist.saveNow,
       createPatch: persist.createPatch,
       loadPatch,
+      loadStarter,
       newBlankPatch,
       blankForSignOut,
       deletePatch,
@@ -473,6 +484,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       persist.saveNow,
       persist.createPatch,
       loadPatch,
+      loadStarter,
       newBlankPatch,
       blankForSignOut,
       deletePatch,
