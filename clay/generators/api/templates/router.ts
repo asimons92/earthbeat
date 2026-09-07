@@ -59,6 +59,8 @@ const connectorSchema = graphNodeBase.extend({
   feedUrl: z.string().optional(),
   pollIntervalMs: z.number().optional(),
   playbackHz: z.number().optional(),
+  playbackSpeed: z.number().optional(),
+  config: z.unknown().optional(),
 });
 
 const modulatorSchema = graphNodeBase.extend({

@@ -25,6 +25,10 @@ export type VoiceParams = {
   modulated: boolean;
 };
 
+/** Latest samples keyed by Connector node id. */
+export type SamplesByConnector = Partial<Record<string, ConnectorSample | EarthquakeSample>>;
+
+/** @deprecated Prefer SamplesByConnector; kept for migration of kind-keyed maps. */
 export type SamplesByKind = Partial<Record<string, ConnectorSample | EarthquakeSample>>;
 
 /**
@@ -67,21 +71,21 @@ function normalizeSample(sample: ConnectorSample | EarthquakeSample | null): Con
 }
 
 function samplesMapFrom(
-  sampleOrMap: SamplesByKind | ConnectorSample | EarthquakeSample | null,
-): SamplesByKind {
+  sampleOrMap: SamplesByConnector | ConnectorSample | EarthquakeSample | null,
+): SamplesByConnector {
   if (!sampleOrMap) return {};
   const asRecord = sampleOrMap as Record<string, unknown>;
   const looksLikeSingleSample =
     typeof asRecord.id === 'string' &&
-    !('usgs_earthquakes' in asRecord) &&
-    !('noaa_coops_tides' in asRecord) &&
-    !('ndbc_buoy_waves' in asRecord);
+    (asRecord.kindKey === 'usgs_earthquakes' ||
+      asRecord.kindKey === 'noaa_coops_tides' ||
+      asRecord.kindKey === 'ndbc_buoy_waves' ||
+      asRecord.kindKey === undefined);
   if (looksLikeSingleSample) {
-    const normalized = normalizeSample(sampleOrMap as ConnectorSample | EarthquakeSample);
-    if (!normalized) return {};
-    return { [normalized.kindKey]: normalized };
+    // Single sample without connector id cannot drive per-node lookup.
+    return {};
   }
-  return sampleOrMap as SamplesByKind;
+  return sampleOrMap as SamplesByConnector;
 }
 
 function mapChainChannel(
@@ -109,19 +113,16 @@ function mapChainChannel(
 
 function sampleForConnector(
   chain: { connector: RuntimeNode },
-  samplesByKind: SamplesByKind,
+  samplesByConnector: SamplesByConnector,
 ): ConnectorSample | null {
-  const kindKey =
-    typeof chain.connector.data.kindKey === 'string' ? chain.connector.data.kindKey : '';
-  if (kindKey.length === 0) return null;
-  return normalizeSample(samplesByKind[kindKey] ?? null);
+  return normalizeSample(samplesByConnector[chain.connector.id] ?? null);
 }
 
 export function resolveVoiceParams(
   nodes: RuntimeNode[],
   edges: RuntimeEdge[],
   oscillatorId: string,
-  sampleOrMap: SamplesByKind | ConnectorSample | EarthquakeSample | null,
+  sampleOrMap: SamplesByConnector | ConnectorSample | EarthquakeSample | null,
 ): VoiceParams {
   const graph = findVoiceGraph(nodes, edges, oscillatorId);
   const oscData = graph.oscillator.data;
@@ -133,10 +134,10 @@ export function resolveVoiceParams(
   let gain = restingGain;
   let modulated = false;
 
-  const samplesByKind = samplesMapFrom(sampleOrMap);
+  const samplesByConnector = samplesMapFrom(sampleOrMap);
 
   if (graph.frequencyChain) {
-    const sample = sampleForConnector(graph.frequencyChain, samplesByKind);
+    const sample = sampleForConnector(graph.frequencyChain, samplesByConnector);
     if (sample) {
       const mapped = mapChainChannel(graph.frequencyChain, sample);
       if (mapped.matched) {
@@ -154,7 +155,7 @@ export function resolveVoiceParams(
   }
 
   if (graph.gainChain) {
-    const sample = sampleForConnector(graph.gainChain, samplesByKind);
+    const sample = sampleForConnector(graph.gainChain, samplesByConnector);
     if (sample) {
       const mapped = mapChainChannel(graph.gainChain, sample);
       if (mapped.matched) {

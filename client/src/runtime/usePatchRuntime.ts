@@ -1,16 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
-import { oscillatorDefaults } from '@/generated/catalog';
+import { getConnectorKind, oscillatorDefaults } from '@/generated/catalog';
 
 import { createPatchAudioEngine, type PatchAudioEngine } from './audioEngine';
 import { audioFxFingerprint, resolveOutboundAudioFxChain } from './audioFxChain';
+import {
+  advanceQueueClock,
+  advanceScrubClock,
+  createQueueClock,
+  createScrubClock,
+  replaceQueueSnapshot,
+  retainScrubPhaseOnSeriesReplace,
+  setClockPlaying,
+  type QueueClock,
+  type ScrubClock,
+} from './connectorClock';
+import {
+  emptyConnectorSamples,
+  setConnectorSample,
+  type ConnectorSampleMap,
+} from './connectorSamples';
 import {
   createPatchTransportState,
   reducePatchTransport,
   shouldHoldSharedStream,
   type PatchTransportState,
 } from './patchTransport';
+import { PLAYBACK_SPEED_DEFAULT, monitorPlaybackSpeed } from './playbackSpeed';
 import {
   resolveVoiceParams,
   type ConnectorSample,
@@ -22,6 +39,13 @@ import {
   pruneSampleHistory,
   type SampleHistoryState,
 } from './sampleHistory';
+import {
+  isTideSeriesSnapshot,
+  isUsgsQueueSnapshot,
+  isWaveSeriesSnapshot,
+  sampleFromKindSnapshot,
+  type KindSnapshot,
+} from './sampleFromSnapshot';
 import { planVoiceCleanup } from './voiceCleanup';
 import { planVoiceParamApply } from './voiceParamApply';
 import {
@@ -39,14 +63,49 @@ export type LiveStatus = 'off' | 'connecting' | 'live' | 'error';
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15000;
 
-function isConnectorSample(value: unknown): value is ConnectorSample {
-  if (!value || typeof value !== 'object') return false;
-  const kindKey = (value as { kindKey?: unknown }).kindKey;
-  return (
-    kindKey === 'usgs_earthquakes' ||
-    kindKey === 'noaa_coops_tides' ||
-    kindKey === 'ndbc_buoy_waves'
-  );
+type ConnectorClock = ScrubClock | QueueClock;
+
+function catalogLoopSeconds(kindKey: string): number {
+  const kind = getConnectorKind(kindKey) as
+    | { defaultLoopSeconds?: number; defaultPlaybackHz?: number }
+    | undefined;
+  if (typeof kind?.defaultLoopSeconds === 'number' && kind.defaultLoopSeconds > 0) {
+    return kind.defaultLoopSeconds;
+  }
+  return 120;
+}
+
+function catalogPlaybackHz(kindKey: string): number {
+  const kind = getConnectorKind(kindKey);
+  if (typeof kind?.defaultPlaybackHz === 'number' && kind.defaultPlaybackHz > 0) {
+    return kind.defaultPlaybackHz;
+  }
+  return 1;
+}
+
+function ensureConnectorClock(
+  existing: ConnectorClock | undefined,
+  kindKey: string,
+  queueLength: number,
+): ConnectorClock {
+  if (kindKey === 'usgs_earthquakes') {
+    if (existing?.mode === 'queue') {
+      return replaceQueueSnapshot(existing, queueLength);
+    }
+    return createQueueClock(queueLength);
+  }
+  if (existing?.mode === 'scrub') {
+    return retainScrubPhaseOnSeriesReplace(existing);
+  }
+  return createScrubClock();
+}
+
+function ensureMonitorClock(
+  existing: ConnectorClock | undefined,
+  kindKey: string,
+  queueLength: number,
+): ConnectorClock {
+  return ensureConnectorClock(existing, kindKey, queueLength);
 }
 
 export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
@@ -64,7 +123,12 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   const eventSourcesRef = useRef<Map<string, EventSource>>(new Map());
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const samplesByKindRef = useRef<Partial<Record<string, ConnectorSample>>>({});
+  const snapshotsByKindRef = useRef<Partial<Record<string, KindSnapshot>>>({});
+  const samplesByConnectorRef = useRef<ConnectorSampleMap<ConnectorSample>>(emptyConnectorSamples());
+  const clocksByConnectorRef = useRef<Map<string, ConnectorClock>>(new Map());
+  const monitorClocksByKindRef = useRef<Map<string, ConnectorClock>>(new Map());
+  const rafRef = useRef<number | null>(null);
+  const lastFrameMsRef = useRef<number | null>(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
   const transportRef = useRef(transport);
@@ -116,7 +180,7 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         runtimeNodes,
         runtimeEdges,
         oscillatorId,
-        samplesByKindRef.current,
+        samplesByConnectorRef.current,
       );
       const osc = runtimeNodes.find((node) => node.id === oscillatorId);
       const restingFreq =
@@ -153,6 +217,162 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
     }
   }, []);
 
+  const tickPlayback = useCallback(
+    (nowMs: number) => {
+      const holding = shouldHoldSharedStream(transportRef.current);
+      const last = lastFrameMsRef.current;
+      lastFrameMsRef.current = nowMs;
+      if (!holding) {
+        lastFrameMsRef.current = null;
+        return;
+      }
+      const dtSeconds = last === null ? 0 : Math.min(0.25, Math.max(0, (nowMs - last) / 1000));
+
+      let samples = samplesByConnectorRef.current;
+      const kindSamples: Partial<Record<string, ConnectorSample>> = {};
+
+      for (const node of nodesRef.current) {
+        if (node.type !== 'connector') continue;
+        const kindKey = typeof node.data.kindKey === 'string' ? node.data.kindKey : '';
+        const snapshot = snapshotsByKindRef.current[kindKey];
+        if (!snapshot) continue;
+
+        const queueLength =
+          snapshot.kindKey === 'usgs_earthquakes' ? snapshot.items.length : 0;
+        let clock = clocksByConnectorRef.current.get(node.id);
+        clock = ensureConnectorClock(clock, kindKey, queueLength);
+        clock = setClockPlaying(clock, true);
+
+        const playbackSpeed =
+          typeof node.data.playbackSpeed === 'number'
+            ? node.data.playbackSpeed
+            : PLAYBACK_SPEED_DEFAULT;
+
+        if (clock.mode === 'scrub') {
+          clock = advanceScrubClock(
+            clock,
+            dtSeconds,
+            catalogLoopSeconds(kindKey),
+            playbackSpeed,
+          );
+        } else {
+          clock = advanceQueueClock(
+            clock,
+            dtSeconds,
+            catalogPlaybackHz(kindKey),
+            playbackSpeed,
+          );
+        }
+        clocksByConnectorRef.current.set(node.id, clock);
+
+        const sample = sampleFromKindSnapshot(snapshot, clock);
+        if (sample) {
+          samples = setConnectorSample(samples, node.id, sample);
+        }
+      }
+
+      const monitorKinds = new Set(stripsRef.current.map((strip) => strip.kindKey));
+      for (const kindKey of monitorKinds) {
+        const snapshot = snapshotsByKindRef.current[kindKey];
+        if (!snapshot) continue;
+        const queueLength =
+          snapshot.kindKey === 'usgs_earthquakes' ? snapshot.items.length : 0;
+        let clock = monitorClocksByKindRef.current.get(kindKey);
+        clock = ensureMonitorClock(clock, kindKey, queueLength);
+        clock = setClockPlaying(clock, true);
+        if (clock.mode === 'scrub') {
+          clock = advanceScrubClock(
+            clock,
+            dtSeconds,
+            catalogLoopSeconds(kindKey),
+            monitorPlaybackSpeed(),
+          );
+        } else {
+          clock = advanceQueueClock(
+            clock,
+            dtSeconds,
+            catalogPlaybackHz(kindKey),
+            monitorPlaybackSpeed(),
+          );
+        }
+        monitorClocksByKindRef.current.set(kindKey, clock);
+        const sample = sampleFromKindSnapshot(snapshot, clock);
+        if (sample) {
+          kindSamples[kindKey] = sample;
+        }
+      }
+
+      samplesByConnectorRef.current = samples;
+
+      if (Object.keys(kindSamples).length > 0) {
+        setLastSamplesByKind((prev) => ({ ...prev, ...kindSamples }));
+        const anySample = Object.values(kindSamples)[0];
+        if (anySample) setLastSample(anySample);
+        setSampleHistoryByStripId((prev) => {
+          let next = prev;
+          for (const sample of Object.values(kindSamples)) {
+            if (!sample) continue;
+            next = appendSampleToHistory(next, stripsRef.current, sample);
+          }
+          return next;
+        });
+      }
+
+      void applySamplesToVoices();
+    },
+    [applySamplesToVoices],
+  );
+
+  const stopRaf = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    lastFrameMsRef.current = null;
+  }, []);
+
+  const startRaf = useCallback(() => {
+    if (rafRef.current !== null) return;
+    const loop = (nowMs: number) => {
+      tickPlayback(nowMs);
+      if (shouldHoldSharedStream(transportRef.current)) {
+        rafRef.current = requestAnimationFrame(loop);
+      } else {
+        rafRef.current = null;
+        lastFrameMsRef.current = null;
+      }
+    };
+    rafRef.current = requestAnimationFrame(loop);
+  }, [tickPlayback]);
+
+  const applySnapshot = useCallback((kindKey: string, snapshot: KindSnapshot) => {
+    snapshotsByKindRef.current = {
+      ...snapshotsByKindRef.current,
+      [kindKey]: snapshot,
+    };
+    const queueLength =
+      snapshot.kindKey === 'usgs_earthquakes' ? snapshot.items.length : 0;
+
+    for (const node of nodesRef.current) {
+      if (node.type !== 'connector') continue;
+      if (node.data.kindKey !== kindKey) continue;
+      const existing = clocksByConnectorRef.current.get(node.id);
+      clocksByConnectorRef.current.set(
+        node.id,
+        ensureConnectorClock(existing, kindKey, queueLength),
+      );
+    }
+
+    const monitorExisting = monitorClocksByKindRef.current.get(kindKey);
+    monitorClocksByKindRef.current.set(
+      kindKey,
+      ensureMonitorClock(monitorExisting, kindKey, queueLength),
+    );
+
+    setLiveStatus('live');
+    reconnectAttemptRef.current = 0;
+  }, []);
+
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimerRef.current !== null) {
       clearTimeout(reconnectTimerRef.current);
@@ -178,29 +398,29 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
       const source = new EventSource(url);
       eventSourcesRef.current.set(kindKey, source);
 
-      source.onmessage = (event) => {
+      const onPayload = (event: MessageEvent<string>) => {
         try {
           const parsed: unknown = JSON.parse(event.data);
-          if (!isConnectorSample(parsed)) {
-            setLiveStatus('error');
+          if (isUsgsQueueSnapshot(parsed) && kindKey === 'usgs_earthquakes') {
+            applySnapshot(kindKey, parsed);
             return;
           }
-          samplesByKindRef.current = {
-            ...samplesByKindRef.current,
-            [parsed.kindKey]: parsed,
-          };
-          setLastSamplesByKind(samplesByKindRef.current);
-          setLastSample(parsed);
-          setSampleHistoryByStripId((prev) =>
-            appendSampleToHistory(prev, stripsRef.current, parsed),
-          );
-          setLiveStatus('live');
-          reconnectAttemptRef.current = 0;
-          void applySamplesToVoices();
+          if (isTideSeriesSnapshot(parsed) && kindKey === 'noaa_coops_tides') {
+            applySnapshot(kindKey, parsed);
+            return;
+          }
+          if (isWaveSeriesSnapshot(parsed) && kindKey === 'ndbc_buoy_waves') {
+            applySnapshot(kindKey, parsed);
+            return;
+          }
+          setLiveStatus('error');
         } catch {
           setLiveStatus('error');
         }
       };
+
+      source.addEventListener('queue', onPayload as EventListener);
+      source.addEventListener('series', onPayload as EventListener);
 
       source.onerror = () => {
         source.close();
@@ -222,13 +442,14 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         }, delay);
       };
     },
-    [applySamplesToVoices, clearReconnectTimer],
+    [applySnapshot, clearReconnectTimer],
   );
 
   const syncStreams = useCallback(() => {
     const hold = shouldHoldSharedStream(transportRef.current);
     if (!hold) {
       disconnectAllStreams();
+      stopRaf();
       return;
     }
 
@@ -248,8 +469,10 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
 
     if (desired.size === 0) {
       setLiveStatus('off');
+    } else {
+      startRaf();
     }
-  }, [disconnectAllStreams, openStream]);
+  }, [disconnectAllStreams, openStream, startRaf, stopRaf]);
 
   useEffect(() => {
     syncStreamsRef.current = syncStreams;
@@ -281,9 +504,22 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         if (prev.playingOscillatorIds.size === 0 && next.playingOscillatorIds.size > 0) {
           setPlayStartedAtMs(Date.now());
         }
+        for (const [id, clock] of clocksByConnectorRef.current) {
+          clocksByConnectorRef.current.set(id, setClockPlaying(clock, true));
+        }
+        for (const [kind, clock] of monitorClocksByKindRef.current) {
+          monitorClocksByKindRef.current.set(kind, setClockPlaying(clock, true));
+        }
       } else {
         disconnectAllStreams();
-        samplesByKindRef.current = {};
+        stopRaf();
+        for (const [id, clock] of clocksByConnectorRef.current) {
+          clocksByConnectorRef.current.set(id, setClockPlaying(clock, false));
+        }
+        for (const [kind, clock] of monitorClocksByKindRef.current) {
+          monitorClocksByKindRef.current.set(kind, setClockPlaying(clock, false));
+        }
+        samplesByConnectorRef.current = emptyConnectorSamples();
         setLastSamplesByKind({});
         setLastSample(null);
         setSampleHistoryByStripId(emptySampleHistory());
@@ -316,7 +552,7 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         await applySamplesToVoices();
       }
     },
-    [applySamplesToVoices, disconnectAllStreams, ensureEngine, syncStreams],
+    [applySamplesToVoices, disconnectAllStreams, ensureEngine, stopRaf, syncStreams],
   );
 
   const dispatchTransport = useCallback(
@@ -358,6 +594,10 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   }, [dispatchTransport]);
 
   const resetTransportForPatchLoad = useCallback(() => {
+    clocksByConnectorRef.current.clear();
+    monitorClocksByKindRef.current.clear();
+    snapshotsByKindRef.current = {};
+    samplesByConnectorRef.current = emptyConnectorSamples();
     dispatchTransport(transportEventForPatchLoad());
   }, [dispatchTransport]);
 
@@ -380,6 +620,13 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         void engine.removeVoice(id);
       }
     }
+
+    const connectorIds = new Set(
+      nodes.filter((node) => node.type === 'connector').map((node) => node.id),
+    );
+    for (const id of [...clocksByConnectorRef.current.keys()]) {
+      if (!connectorIds.has(id)) clocksByConnectorRef.current.delete(id);
+    }
   }, [nodes, dispatchTransport, transport.playingOscillatorIds]);
 
   useEffect(() => {
@@ -390,6 +637,7 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
 
   useEffect(() => {
     return () => {
+      stopRaf();
       disconnectAllStreams();
       const engine = engineRef.current;
       engineRef.current = null;
@@ -397,7 +645,7 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         void engine.dispose();
       }
     };
-  }, [disconnectAllStreams]);
+  }, [disconnectAllStreams, stopRaf]);
 
   return {
     transport,

@@ -4,6 +4,7 @@ export type ConnectorNodeData = {
   label: string;
   kindKey: string;
   status: string;
+  playbackSpeed?: number;
   interpolate?: boolean;
 };
 

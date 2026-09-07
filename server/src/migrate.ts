@@ -45,8 +45,12 @@ export async function ensureSchema(): Promise<void> {
       feed_url text,
       poll_interval_ms double precision,
       playback_hz double precision,
+      playback_speed double precision,
       config jsonb
     );
+  `);
+  await db.execute(sql`
+    ALTER TABLE connectors ADD COLUMN IF NOT EXISTS playback_speed double precision;
   `);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS oscillators (

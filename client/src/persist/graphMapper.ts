@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { effectStatusLine } from '@/catalog/buildEffectNode';
+import { PLAYBACK_SPEED_DEFAULT } from '@/runtime/playbackSpeed';
 
 export type DomainConnector = {
   id: string;
@@ -12,6 +13,7 @@ export type DomainConnector = {
   feedUrl?: string;
   pollIntervalMs?: number;
   playbackHz?: number;
+  playbackSpeed?: number;
   config?: unknown;
 };
 
@@ -101,6 +103,7 @@ export function flowToDomainGraph(patchId: string, nodes: Node[], edges: Edge[])
         feedUrl: typeof data.feedUrl === 'string' ? data.feedUrl : undefined,
         pollIntervalMs: typeof data.pollIntervalMs === 'number' ? data.pollIntervalMs : undefined,
         playbackHz: typeof data.playbackHz === 'number' ? data.playbackHz : undefined,
+        playbackSpeed: typeof data.playbackSpeed === 'number' ? data.playbackSpeed : undefined,
         config: interpolate === undefined ? undefined : { interpolate },
       });
     } else if (node.type === 'modulator') {
@@ -173,6 +176,8 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
         feedUrl: row.feedUrl,
         pollIntervalMs: row.pollIntervalMs,
         playbackHz: row.playbackHz,
+        playbackSpeed:
+          typeof row.playbackSpeed === 'number' ? row.playbackSpeed : PLAYBACK_SPEED_DEFAULT,
         ...(readInterpolateFlag(row.config) === undefined
           ? {}
           : { interpolate: readInterpolateFlag(row.config) }),

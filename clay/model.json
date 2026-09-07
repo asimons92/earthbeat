@@ -181,6 +181,7 @@
           "feedUrl": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter",
           "defaultPollIntervalMs": 360000,
           "defaultPlaybackHz": 1,
+          "defaultLoopSeconds": 120,
           "defaultConfig": {
             "station": "9414290",
             "product": "water_level",
@@ -228,6 +229,7 @@
           "feedUrl": "https://www.ndbc.noaa.gov/data/realtime2/46026.txt",
           "defaultPollIntervalMs": 1800000,
           "defaultPlaybackHz": 1,
+          "defaultLoopSeconds": 90,
           "defaultConfig": {
             "station": "46026",
             "interpolate": true
@@ -715,7 +717,13 @@
             "name": "playbackHz",
             "type": "number",
             "default": 4,
-            "description": "How many queued samples to emit per second (earthbeat v1 EarthquakeStream hz)."
+            "description": "Legacy absolute emit rate. Unused by the live client-owned tempo path."
+          },
+          {
+            "name": "playbackSpeed",
+            "type": "number",
+            "default": 1,
+            "description": "Unitless multiplier of catalog tempo. 1 matches defaultPlaybackHz or defaultLoopSeconds; higher is faster."
           },
           {
             "name": "config",
@@ -767,6 +775,11 @@
                 "name": "playbackHz",
                 "type": "number",
                 "default": 4
+              },
+              {
+                "name": "playbackSpeed",
+                "type": "number",
+                "default": 1
               }
             ]
           },

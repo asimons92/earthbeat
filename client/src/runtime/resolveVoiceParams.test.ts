@@ -154,7 +154,7 @@ describe('resolveVoiceParams', () => {
             { id: 'a', source: connId, target: modId },
             { id: 'b', source: modId, target: oscId },
           ];
-          const params = resolveVoiceParams(nodes, edges, oscId, sample);
+          const params = resolveVoiceParams(nodes, edges, oscId, { [connId]: sample });
           const expectedFreq = modulateFrequencyFromBase(
             sample.mag,
             inMin,
@@ -221,9 +221,9 @@ describe('resolveVoiceParams', () => {
             { id: 'a', source: connId, target: modId },
             { id: 'b', source: modId, target: oscId },
           ];
-          const withUsgs = resolveVoiceParams(nodes, edges, oscId, usgsSample);
-          const withNoaa = resolveVoiceParams(nodes, edges, oscId, noaaSample);
-          const withWaves = resolveVoiceParams(nodes, edges, oscId, waveSample);
+          const withUsgs = resolveVoiceParams(nodes, edges, oscId, { [connId]: usgsSample });
+          const withNoaa = resolveVoiceParams(nodes, edges, oscId, { [connId]: noaaSample });
+          const withWaves = resolveVoiceParams(nodes, edges, oscId, { [connId]: waveSample });
           const resting = false;
           expect(withNoaa.frequencyHz).toBe(restingFreq);
           expect(withNoaa.modulated).toBe(resting);
@@ -283,8 +283,8 @@ describe('resolveVoiceParams', () => {
             { id: 'a', source: connId, target: modId },
             { id: 'b', source: modId, target: oscId },
           ];
-          const withWave = resolveVoiceParams(nodes, edges, oscId, waveSample);
-          const withUsgs = resolveVoiceParams(nodes, edges, oscId, usgsSample);
+          const withWave = resolveVoiceParams(nodes, edges, oscId, { [connId]: waveSample });
+          const withUsgs = resolveVoiceParams(nodes, edges, oscId, { [connId]: usgsSample });
           expect(withUsgs.frequencyHz).toBe(restingFreq);
           expect(withWave.frequencyHz).toBe(
             modulateFrequencyFromBase(
@@ -352,7 +352,7 @@ describe('resolveVoiceParams', () => {
           { id: 'b', source: modId, target: effectId },
           { id: 'c', source: effectId, target: oscId },
         ];
-        const params = resolveVoiceParams(nodes, edges, oscId, sample);
+        const params = resolveVoiceParams(nodes, edges, oscId, { [connId]: sample });
         const preSnap = modulateFrequencyFromBase(
           sample.mag,
           inMin,

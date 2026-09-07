@@ -1,4 +1,5 @@
 import { resolveConnectorKind, type ConnectorKindLike } from './resolveConnectorKind';
+import { PLAYBACK_SPEED_DEFAULT } from '@/runtime/playbackSpeed';
 
 export type ConnectorNodeDraft = {
   id: string;
@@ -8,6 +9,7 @@ export type ConnectorNodeDraft = {
     label: string;
     kindKey: string;
     status: string;
+    playbackSpeed: number;
     interpolate?: boolean;
   };
 };
@@ -47,6 +49,7 @@ export function buildConnectorNode<T extends ConnectorKindLike & {
       label,
       kindKey: kind.key,
       status: args.status ?? 'M —',
+      playbackSpeed: PLAYBACK_SPEED_DEFAULT,
       ...(interpolate === undefined ? {} : { interpolate }),
     },
   };

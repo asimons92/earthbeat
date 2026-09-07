@@ -74,6 +74,8 @@ export type Connector = {
 
   playbackHz?: number;
 
+  playbackSpeed?: number;
+
   config?: unknown;
 
 };

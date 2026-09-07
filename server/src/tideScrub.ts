@@ -53,9 +53,13 @@ export function interpolateTidePhase(
 
 /** Advance phase by dtSeconds over a full-loop duration of loopSeconds. */
 export function advanceTidePhase(phase: number, dtSeconds: number, loopSeconds: number): number {
-  if (!(loopSeconds > 0)) return phase - Math.floor(phase);
+  if (!(loopSeconds > 0)) {
+    const wrapped = phase - Math.floor(phase);
+    return wrapped < 1 ? wrapped : 0;
+  }
   const next = phase + dtSeconds / loopSeconds;
-  return next - Math.floor(next);
+  const wrapped = next - Math.floor(next);
+  return wrapped < 1 ? wrapped : 0;
 }
 
 export function seriesWaterLevelBounds(

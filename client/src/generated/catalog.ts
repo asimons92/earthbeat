@@ -74,6 +74,7 @@ export const connectorKinds = [
     "feedUrl": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter",
     "defaultPollIntervalMs": 360000,
     "defaultPlaybackHz": 1,
+    "defaultLoopSeconds": 120,
     "defaultConfig": {
       "station": "9414290",
       "product": "water_level",
@@ -121,6 +122,7 @@ export const connectorKinds = [
     "feedUrl": "https://www.ndbc.noaa.gov/data/realtime2/46026.txt",
     "defaultPollIntervalMs": 1800000,
     "defaultPlaybackHz": 1,
+    "defaultLoopSeconds": 90,
     "defaultConfig": {
       "station": "46026",
       "interpolate": true

@@ -79,6 +79,8 @@ export const connectors = pgTable('connectors', {
 
   playbackHz: doublePrecision('playback_hz'),
 
+  playbackSpeed: doublePrecision('playback_speed'),
+
   config: jsonb('config'),
 
 });

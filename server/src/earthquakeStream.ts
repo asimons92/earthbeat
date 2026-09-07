@@ -2,7 +2,6 @@ import { EventEmitter } from 'node:events';
 
 import { pruneSeenIds } from './pruneSeenIds.js';
 import {
-  DEFAULT_PLAYBACK_HZ,
   DEFAULT_POLL_INTERVAL_MS,
   fetchDailyEarthquakes,
   type UsgsEarthquakeFeature,
@@ -18,9 +17,14 @@ export type EarthquakeSample = {
   time: number;
 };
 
+export type EarthquakeQueueSnapshot = {
+  kindKey: 'usgs_earthquakes';
+  items: EarthquakeSample[];
+};
+
 export type EarthquakeStreamOptions = {
-  hz?: number;
   pollIntervalMs?: number;
+  fetchFeed?: typeof fetchDailyEarthquakes;
 };
 
 function toSample(feature: UsgsEarthquakeFeature): EarthquakeSample {
@@ -38,34 +42,29 @@ function toSample(feature: UsgsEarthquakeFeature): EarthquakeSample {
 
 export class EarthquakeStream extends EventEmitter {
   private readonly pollIntervalMs: number;
-  private readonly tickIntervalMs: number;
+  private readonly fetchFeed: typeof fetchDailyEarthquakes;
   private readonly queue: EarthquakeSample[] = [];
   private readonly seenIds = new Set<string>();
-  private cursor = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
-  private tickTimer: ReturnType<typeof setInterval> | null = null;
   private refreshing = false;
 
   constructor({
-    hz = DEFAULT_PLAYBACK_HZ,
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+    fetchFeed = fetchDailyEarthquakes,
   }: EarthquakeStreamOptions = {}) {
     super();
     this.pollIntervalMs = pollIntervalMs;
-    this.tickIntervalMs = 1000 / hz;
+    this.fetchFeed = fetchFeed;
   }
 
   async start(): Promise<void> {
-    if (this.tickTimer !== null) {
+    if (this.pollTimer !== null) {
       return;
     }
     await this.refresh();
     this.pollTimer = setInterval(() => {
       void this.refresh();
     }, this.pollIntervalMs);
-    this.tickTimer = setInterval(() => {
-      this.tick();
-    }, this.tickIntervalMs);
   }
 
   stop(): void {
@@ -73,15 +72,28 @@ export class EarthquakeStream extends EventEmitter {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
-    if (this.tickTimer !== null) {
-      clearInterval(this.tickTimer);
-      this.tickTimer = null;
-    }
+  }
+
+  /** True when the poll timer is running (no sample tick timers). */
+  isPolling(): boolean {
+    return this.pollTimer !== null;
+  }
+
+  /** Current playback queue for SSE subscribers. */
+  getQueueSnapshot(): EarthquakeQueueSnapshot {
+    return {
+      kindKey: 'usgs_earthquakes',
+      items: this.queue.slice(),
+    };
   }
 
   /** Test helper: current seen id count after prune cycles. */
   getSeenIdCount(): number {
     return this.seenIds.size;
+  }
+
+  private emitQueue(): void {
+    this.emit('queue', this.getQueueSnapshot());
   }
 
   private async refresh(): Promise<void> {
@@ -90,14 +102,13 @@ export class EarthquakeStream extends EventEmitter {
     }
     this.refreshing = true;
     try {
-      const feed = await fetchDailyEarthquakes();
-      const appended = this.appendNewEarthquakes(feed.features);
+      const feed = await this.fetchFeed();
+      this.appendNewEarthquakes(feed.features);
       const feedIds = feed.features.map((feature) => feature.id);
       const queueIds = this.queue.map((sample) => sample.id);
       pruneSeenIds(this.seenIds, feedIds, queueIds);
-      if (appended > 0) {
-        this.emit('refresh', { appended, queueLength: this.queue.length });
-      }
+      this.emitQueue();
+      this.emit('refresh', { queueLength: this.queue.length });
     } catch (error) {
       this.emit('error', error);
     } finally {
@@ -115,17 +126,5 @@ export class EarthquakeStream extends EventEmitter {
       this.queue.push(sample);
     }
     return newcomers.length;
-  }
-
-  private tick(): void {
-    if (this.queue.length === 0) {
-      return;
-    }
-    const sample = this.queue[this.cursor];
-    if (sample === undefined) {
-      return;
-    }
-    this.cursor = (this.cursor + 1) % this.queue.length;
-    this.emit('sample', sample);
   }
 }

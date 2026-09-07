@@ -26,6 +26,12 @@ import {
 } from '@/generated/catalog';
 import { audioFxIssueLabelsByNodeId } from '@/runtime/audioFxChain';
 import {
+  PLAYBACK_SPEED_DEFAULT,
+  PLAYBACK_SPEED_MAX,
+  PLAYBACK_SPEED_MIN,
+  normalizePlaybackSpeed,
+} from '@/runtime/playbackSpeed';
+import {
   clampDrive,
   clampFeedback,
   clampMix,
@@ -302,12 +308,16 @@ export function NodeInspector({
       label: string;
       kindKey: string;
       status: string;
+      playbackSpeed?: number;
       interpolate?: boolean;
     };
     const kind = getConnectorKind(data.kindKey) ?? usgsConnector;
     const supportsInterpolate =
       data.kindKey === 'noaa_coops_tides' || data.kindKey === 'ndbc_buoy_waves';
     const interpolate = data.interpolate !== false;
+    const playbackSpeed = normalizePlaybackSpeed(
+      data.playbackSpeed ?? PLAYBACK_SPEED_DEFAULT,
+    );
     return (
       <aside className="shell__inspector" aria-label="Node inspector">
         <div className="inspector__title">Connector</div>
@@ -315,6 +325,27 @@ export function NodeInspector({
         <div className="inspector__field">
           <Label>Connector kind</Label>
           <p className="inspector__readonly">{kind.label}</p>
+        </div>
+        <div className="inspector__field">
+          <Label htmlFor="connector-playback-speed">Playback speed</Label>
+          <Input
+            id="connector-playback-speed"
+            type="number"
+            min={PLAYBACK_SPEED_MIN}
+            max={PLAYBACK_SPEED_MAX}
+            step={0.25}
+            value={playbackSpeed}
+            onChange={(event) => {
+              const nextSpeed = normalizePlaybackSpeed(Number(event.target.value));
+              onChangeNodeData(selected.id, {
+                ...data,
+                playbackSpeed: nextSpeed,
+              });
+            }}
+          />
+          <p className="inspector__hint">
+            1 is catalog tempo. Higher values play the loop or queue faster.
+          </p>
         </div>
         {supportsInterpolate ? (
           <div className="inspector__field">

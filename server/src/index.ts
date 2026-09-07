@@ -12,7 +12,7 @@ import {
   getAuthMode,
   resolveRequestUser,
 } from './auth.js';
-import { EarthquakeStream, type EarthquakeSample } from './earthquakeStream.js';
+import { EarthquakeStream, type EarthquakeQueueSnapshot } from './earthquakeStream.js';
 import { appRouter } from './generated/router.js';
 import { ensureSchema } from './migrate.js';
 import {
@@ -20,19 +20,11 @@ import {
   DEFAULT_SSE_MAX_CONNECTIONS,
 } from './sseConnectionGate.js';
 import { classifyRequestPath, resolveClientDistDir } from './staticSite.js';
-import { TideStream, type TideSample } from './tideStream.js';
-import { WaveStream, type WaveSample } from './waveStream.js';
-import {
-  DEFAULT_LOOP_SECONDS,
-  DEFAULT_PLAYBACK_HZ as TIDE_PLAYBACK_HZ,
-  DEFAULT_POLL_INTERVAL_MS as TIDE_POLL_INTERVAL_MS,
-} from './noaaCoops.js';
-import {
-  DEFAULT_LOOP_SECONDS as WAVE_LOOP_SECONDS,
-  DEFAULT_PLAYBACK_HZ as WAVE_PLAYBACK_HZ,
-  DEFAULT_POLL_INTERVAL_MS as WAVE_POLL_INTERVAL_MS,
-} from './ndbcBuoy.js';
-import { DEFAULT_PLAYBACK_HZ, DEFAULT_POLL_INTERVAL_MS } from './usgs.js';
+import { TideStream, type TideSeriesSnapshot } from './tideStream.js';
+import { WaveStream, type WaveSeriesSnapshot } from './waveStream.js';
+import { DEFAULT_POLL_INTERVAL_MS as TIDE_POLL_INTERVAL_MS } from './noaaCoops.js';
+import { DEFAULT_POLL_INTERVAL_MS as WAVE_POLL_INTERVAL_MS } from './ndbcBuoy.js';
+import { DEFAULT_POLL_INTERVAL_MS } from './usgs.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
@@ -83,20 +75,15 @@ app.use(
 );
 
 const earthquakeStream = new EarthquakeStream({
-  hz: DEFAULT_PLAYBACK_HZ,
   pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
 });
 
 const tideStream = new TideStream({
-  hz: TIDE_PLAYBACK_HZ,
   pollIntervalMs: TIDE_POLL_INTERVAL_MS,
-  loopSeconds: DEFAULT_LOOP_SECONDS,
 });
 
 const waveStream = new WaveStream({
-  hz: WAVE_PLAYBACK_HZ,
   pollIntervalMs: WAVE_POLL_INTERVAL_MS,
-  loopSeconds: WAVE_LOOP_SECONDS,
 });
 
 earthquakeStream.on('error', (error) => {
@@ -122,14 +109,15 @@ app.get('/api/earthquakes/stream', (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
-  const onSample = (sample: EarthquakeSample) => {
-    res.write(`data: ${JSON.stringify(sample)}\n\n`);
+  const writeQueue = (snapshot: EarthquakeQueueSnapshot) => {
+    res.write(`event: queue\ndata: ${JSON.stringify(snapshot)}\n\n`);
   };
 
-  earthquakeStream.on('sample', onSample);
+  writeQueue(earthquakeStream.getQueueSnapshot());
+  earthquakeStream.on('queue', writeQueue);
 
   req.on('close', () => {
-    earthquakeStream.off('sample', onSample);
+    earthquakeStream.off('queue', writeQueue);
     sseGate.release();
   });
 });
@@ -145,14 +133,15 @@ app.get('/api/tides/stream', (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
-  const onSample = (sample: TideSample) => {
-    res.write(`data: ${JSON.stringify(sample)}\n\n`);
+  const writeSeries = (snapshot: TideSeriesSnapshot) => {
+    res.write(`event: series\ndata: ${JSON.stringify(snapshot)}\n\n`);
   };
 
-  tideStream.on('sample', onSample);
+  writeSeries(tideStream.getSeriesSnapshot());
+  tideStream.on('series', writeSeries);
 
   req.on('close', () => {
-    tideStream.off('sample', onSample);
+    tideStream.off('series', writeSeries);
     sseGate.release();
   });
 });
@@ -168,14 +157,15 @@ app.get('/api/waves/stream', (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
-  const onSample = (sample: WaveSample) => {
-    res.write(`data: ${JSON.stringify(sample)}\n\n`);
+  const writeSeries = (snapshot: WaveSeriesSnapshot) => {
+    res.write(`event: series\ndata: ${JSON.stringify(snapshot)}\n\n`);
   };
 
-  waveStream.on('sample', onSample);
+  writeSeries(waveStream.getSeriesSnapshot());
+  waveStream.on('series', writeSeries);
 
   req.on('close', () => {
-    waveStream.off('sample', onSample);
+    waveStream.off('series', writeSeries);
     sseGate.release();
   });
 });
