@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
+import { Knob } from '@/components/Knob';
 import { Button } from '@/components/ui/button';
 import { ModulatorTransferCurve } from '@/components/ModulatorTransferCurve';
 import { effectStatusLine } from '@/catalog/buildEffectNode';
+import { formatOscillatorHzStatus, roundFrequencyHz } from '@/catalog/oscillatorHz';
 import { oscillatorLabel } from '@/catalog/oscillatorLabel';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -34,12 +35,25 @@ import {
   normalizePlaybackSpeed,
 } from '@/runtime/playbackSpeed';
 import {
+  DRIVE_MAX,
+  DRIVE_MIN,
+  FEEDBACK_MAX,
+  FEEDBACK_MIN,
+  MIX_MAX,
+  MIX_MIN,
+  TIME_MS_MAX,
+  TIME_MS_MIN,
   clampDrive,
   clampFeedback,
   clampMix,
   clampTimeMs,
 } from '@/runtime/audioFxParams';
 import { toRuntimeEdges, toRuntimeNodes } from '@/runtime/runtimeNodes';
+
+const frequencyParam = oscillatorModulatableParams.find(
+  (entry) => entry.key === 'frequencyHz',
+)!;
+const gainParam = oscillatorModulatableParams.find((entry) => entry.key === 'gain')!;
 
 function modulatorStatus(data: {
   channelKey: string;
@@ -306,20 +320,26 @@ export function NodeInspector({
         <div className="inspector__row">
           <div className="inspector__field">
             <Label htmlFor="modulator-in-min">In min</Label>
-            <Input
+            <Knob
               id="modulator-in-min"
-              type="number"
               value={data.inMin}
-              onChange={(event) => patchModulator({ inMin: Number(event.target.value) })}
+              min={xLock?.min ?? data.inMin}
+              max={xLock?.max ?? data.inMin}
+              disabled={!xLock || xLock.min >= xLock.max}
+              decimals={2}
+              onChange={(inMin) => patchModulator({ inMin })}
             />
           </div>
           <div className="inspector__field">
             <Label htmlFor="modulator-in-max">In max</Label>
-            <Input
+            <Knob
               id="modulator-in-max"
-              type="number"
               value={data.inMax}
-              onChange={(event) => patchModulator({ inMax: Number(event.target.value) })}
+              min={xLock?.min ?? data.inMax}
+              max={xLock?.max ?? data.inMax}
+              disabled={!xLock || xLock.min >= xLock.max}
+              decimals={2}
+              onChange={(inMax) => patchModulator({ inMax })}
             />
           </div>
         </div>
@@ -329,24 +349,28 @@ export function NodeInspector({
             <Label htmlFor="modulator-out-min">
               {data.targetParam === 'frequencyHz' ? 'Ratio min' : 'Out min'}
             </Label>
-            <Input
+            <Knob
               id="modulator-out-min"
-              type="number"
-              step={data.targetParam === 'frequencyHz' ? '0.1' : undefined}
               value={data.outMin}
-              onChange={(event) => patchModulator({ outMin: Number(event.target.value) })}
+              min={yLock?.min ?? data.outMin}
+              max={yLock?.max ?? data.outMin}
+              disabled={!yLock || yLock.min >= yLock.max}
+              decimals={2}
+              onChange={(outMin) => patchModulator({ outMin })}
             />
           </div>
           <div className="inspector__field">
             <Label htmlFor="modulator-out-max">
               {data.targetParam === 'frequencyHz' ? 'Ratio max' : 'Out max'}
             </Label>
-            <Input
+            <Knob
               id="modulator-out-max"
-              type="number"
-              step={data.targetParam === 'frequencyHz' ? '0.1' : undefined}
               value={data.outMax}
-              onChange={(event) => patchModulator({ outMax: Number(event.target.value) })}
+              min={yLock?.min ?? data.outMax}
+              max={yLock?.max ?? data.outMax}
+              disabled={!yLock || yLock.min >= yLock.max}
+              decimals={2}
+              onChange={(outMax) => patchModulator({ outMax })}
             />
           </div>
         </div>
@@ -380,18 +404,16 @@ export function NodeInspector({
         </div>
         <div className="inspector__field">
           <Label htmlFor="connector-playback-speed">Playback speed</Label>
-          <Input
+          <Knob
             id="connector-playback-speed"
-            type="number"
+            value={playbackSpeed}
             min={PLAYBACK_SPEED_MIN}
             max={PLAYBACK_SPEED_MAX}
-            step={0.25}
-            value={playbackSpeed}
-            onChange={(event) => {
-              const nextSpeed = normalizePlaybackSpeed(Number(event.target.value));
+            decimals={2}
+            onChange={(nextSpeed) => {
               onChangeNodeData(selected.id, {
                 ...data,
-                playbackSpeed: nextSpeed,
+                playbackSpeed: normalizePlaybackSpeed(nextSpeed),
               });
             }}
           />
@@ -541,14 +563,13 @@ export function NodeInspector({
         {isDistortion ? (
           <div className="inspector__field">
             <Label htmlFor="effect-drive">Drive</Label>
-            <Input
+            <Knob
               id="effect-drive"
-              type="number"
-              min={1}
-              max={20}
-              step={0.1}
               value={data.drive}
-              onChange={(event) => patchEffect({ drive: clampDrive(Number(event.target.value)) })}
+              min={DRIVE_MIN}
+              max={DRIVE_MAX}
+              decimals={1}
+              onChange={(drive) => patchEffect({ drive: clampDrive(drive) })}
             />
           </div>
         ) : null}
@@ -556,40 +577,35 @@ export function NodeInspector({
           <>
             <div className="inspector__field">
               <Label htmlFor="effect-time-ms">Time (ms)</Label>
-              <Input
+              <Knob
                 id="effect-time-ms"
-                type="number"
-                min={20}
-                max={1000}
-                step={1}
                 value={data.timeMs}
-                onChange={(event) => patchEffect({ timeMs: clampTimeMs(Number(event.target.value)) })}
+                min={TIME_MS_MIN}
+                max={TIME_MS_MAX}
+                decimals={0}
+                onChange={(timeMs) => patchEffect({ timeMs: clampTimeMs(timeMs) })}
               />
             </div>
             <div className="inspector__field">
               <Label htmlFor="effect-feedback">Feedback</Label>
-              <Input
+              <Knob
                 id="effect-feedback"
-                type="number"
-                min={0}
-                max={0.95}
-                step={0.01}
                 value={data.feedback}
-                onChange={(event) =>
-                  patchEffect({ feedback: clampFeedback(Number(event.target.value)) })
-                }
+                min={FEEDBACK_MIN}
+                max={FEEDBACK_MAX}
+                decimals={2}
+                onChange={(feedback) => patchEffect({ feedback: clampFeedback(feedback) })}
               />
             </div>
             <div className="inspector__field">
               <Label htmlFor="effect-mix">Mix</Label>
-              <Input
+              <Knob
                 id="effect-mix"
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
                 value={data.mix}
-                onChange={(event) => patchEffect({ mix: clampMix(Number(event.target.value)) })}
+                min={MIX_MIN}
+                max={MIX_MAX}
+                decimals={2}
+                onChange={(mix) => patchEffect({ mix: clampMix(mix) })}
               />
             </div>
           </>
@@ -632,7 +648,7 @@ export function NodeInspector({
                 label: oscillatorLabel(value, oscillatorWaveforms),
                 frequencyHz,
                 gain,
-                status: `${frequencyHz} Hz`,
+                status: formatOscillatorHzStatus(frequencyHz),
               });
             }}
           >
@@ -650,37 +666,38 @@ export function NodeInspector({
         </div>
         <div className="inspector__field">
           <Label htmlFor="oscillator-frequency">Frequency (Hz)</Label>
-          <Input
+          <Knob
             id="oscillator-frequency"
-            type="number"
             value={frequencyHz}
-            onChange={(event) => {
-              const nextFrequency = Number(event.target.value);
+            min={frequencyParam.min}
+            max={frequencyParam.max}
+            curve="log"
+            decimals={1}
+            onChange={(nextFrequency) => {
+              const rounded = roundFrequencyHz(nextFrequency);
               onChangeNodeData(selected.id, {
                 ...data,
-                frequencyHz: nextFrequency,
+                frequencyHz: rounded,
                 gain,
-                status: `${nextFrequency} Hz`,
+                status: formatOscillatorHzStatus(rounded),
               });
             }}
           />
         </div>
         <div className="inspector__field">
           <Label htmlFor="oscillator-gain">Gain</Label>
-          <Input
+          <Knob
             id="oscillator-gain"
-            type="number"
-            step="0.01"
-            min={0}
-            max={1}
             value={gain}
-            onChange={(event) => {
-              const nextGain = Number(event.target.value);
+            min={gainParam.min}
+            max={gainParam.max}
+            decimals={2}
+            onChange={(nextGain) => {
               onChangeNodeData(selected.id, {
                 ...data,
                 frequencyHz,
                 gain: nextGain,
-                status: `${frequencyHz} Hz`,
+                status: formatOscillatorHzStatus(frequencyHz),
               });
             }}
           />

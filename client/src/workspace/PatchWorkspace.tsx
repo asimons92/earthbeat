@@ -27,6 +27,7 @@ import {
   type ModulatorChannelOption,
   type ModulatorTargetOption,
 } from '@/catalog/modulatorMapping';
+import { formatOscillatorHzStatus } from '@/catalog/oscillatorHz';
 import { oscillatorLabel } from '@/catalog/oscillatorLabel';
 import {
   connectorKindsByKey,
@@ -340,7 +341,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
           waveform: oscillatorDefaults.waveform,
           frequencyHz: oscillatorDefaults.frequencyHz,
           gain: oscillatorDefaults.gain,
-          status: `${oscillatorDefaults.frequencyHz} Hz`,
+          status: formatOscillatorHzStatus(oscillatorDefaults.frequencyHz),
         },
       };
       return [...current, node];

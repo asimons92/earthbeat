@@ -380,6 +380,59 @@ body,
   gap: 0.5rem;
 }
 
+.inspector__knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.inspector__knob-dial {
+  position: relative;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--bg);
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.inspector__knob-dial:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring);
+}
+
+.inspector__knob-dial[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.inspector__knob-indicator {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--knob-angle, -135deg));
+}
+
+.inspector__knob-needle {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  width: 1px;
+  height: 38%;
+  margin-left: -0.5px;
+  background: var(--ink);
+}
+
+.inspector__knob-readout {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .inspector__transfer {
   width: 100%;
 }

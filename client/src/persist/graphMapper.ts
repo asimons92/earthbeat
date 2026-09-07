@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { effectStatusLine } from '@/catalog/buildEffectNode';
+import { formatOscillatorHzStatus } from '@/catalog/oscillatorHz';
 import { PLAYBACK_SPEED_DEFAULT } from '@/runtime/playbackSpeed';
 
 export type DomainConnector = {
@@ -207,7 +208,7 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
         waveform: row.waveform,
         frequencyHz: row.frequencyHz,
         gain: row.gain,
-        status: `${row.frequencyHz} Hz`,
+        status: formatOscillatorHzStatus(row.frequencyHz),
       },
     })),
     ...(graph.effects ?? []).map((row) => {

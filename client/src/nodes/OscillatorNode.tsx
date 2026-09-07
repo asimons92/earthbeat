@@ -1,5 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 
+import { formatOscillatorHzStatus } from '@/catalog/oscillatorHz';
+
 export type OscillatorNodeData = {
   label: string;
   waveform: string;
@@ -12,6 +14,13 @@ export type OscillatorNodeData = {
 
 export type OscillatorFlowNode = Node<OscillatorNodeData, 'oscillator'>;
 
+function oscillatorStatusLine(data: OscillatorNodeData): string {
+  if (typeof data.status === 'string' && data.status.endsWith(' Hz')) {
+    return formatOscillatorHzStatus(data.frequencyHz);
+  }
+  return data.status;
+}
+
 export function OscillatorNode({ id, data }: NodeProps<OscillatorFlowNode>) {
   const playing = Boolean(data.playing);
 
@@ -20,7 +29,7 @@ export function OscillatorNode({ id, data }: NodeProps<OscillatorFlowNode>) {
       <Handle type="target" position={Position.Left} id="in" />
       <div className="graph-node__kind">Oscillator</div>
       <div className="graph-node__title">{data.label}</div>
-      <div className="graph-node__status">{data.status}</div>
+      <div className="graph-node__status">{oscillatorStatusLine(data)}</div>
       <button
         type="button"
         className={playing ? 'graph-node__play graph-node__play--on' : 'graph-node__play'}
