@@ -204,14 +204,27 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
 
   async function dispose() {
     voices.clear();
+    // Disconnect first so an orphaned context cannot keep sounding while render closes.
+    try {
+      analyser.disconnect();
+    } catch {
+      // Already disconnected.
+    }
+    try {
+      node.disconnect();
+    } catch {
+      // Already disconnected.
+    }
     try {
       await enqueueRebuild();
     } catch {
       // Renderer may already be torn down.
     }
-    analyser.disconnect();
-    node.disconnect();
-    await ctx.close();
+    try {
+      await ctx.close();
+    } catch {
+      // Context may already be closed.
+    }
   }
 
   return {

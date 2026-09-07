@@ -5,6 +5,7 @@ import { getConnectorKind, oscillatorDefaults } from '@/generated/catalog';
 
 import { createPatchAudioEngine, type PatchAudioEngine } from './audioEngine';
 import { audioFxFingerprint, resolveOutboundAudioFxChain } from './audioFxChain';
+import { createSingletonAsync, type SingletonAsync } from './singletonAsync';
 import {
   advanceQueueClock,
   advanceScrubClock,
@@ -126,6 +127,12 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   const [playStartedAtMs, setPlayStartedAtMs] = useState<number | null>(null);
 
   const engineRef = useRef<PatchAudioEngine | null>(null);
+  const engineSingletonRef = useRef<SingletonAsync<PatchAudioEngine> | null>(null);
+  if (engineSingletonRef.current === null) {
+    engineSingletonRef.current = createSingletonAsync(createPatchAudioEngine, (abandoned) => {
+      void abandoned.dispose();
+    });
+  }
   const eventSourcesRef = useRef<Map<string, EventSource>>(new Map());
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -521,13 +528,13 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   }, [syncStreams]);
 
   const ensureEngine = useCallback(async () => {
-    if (!engineRef.current) {
-      engineRef.current = await createPatchAudioEngine();
+    const singleton = engineSingletonRef.current!;
+    const engine = await singleton.get();
+    engineRef.current = engine;
+    if (engine.ctx.state === 'suspended') {
+      await engine.ctx.resume();
     }
-    if (engineRef.current.ctx.state === 'suspended') {
-      await engineRef.current.ctx.resume();
-    }
-    return engineRef.current;
+    return engine;
   }, []);
 
   const getTimeDomainSnapshot = useCallback((out: Float32Array) => {
@@ -601,12 +608,14 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
 
   const dispatchTransport = useCallback(
     (event: Parameters<typeof reducePatchTransport>[1]) => {
-      setTransport((prev) => {
-        const next = reducePatchTransport(prev, event);
-        queueMicrotask(() => {
-          void syncTransportSideEffects(next, prev);
-        });
-        return next;
+      // Side effects stay outside setState. Strict Mode can double-run updaters in
+      // development and would schedule two ensureEngine creates otherwise.
+      const prev = transportRef.current;
+      const next = reducePatchTransport(prev, event);
+      transportRef.current = next;
+      setTransport(next);
+      queueMicrotask(() => {
+        void syncTransportSideEffects(next, prev);
       });
     },
     [syncTransportSideEffects],
@@ -685,7 +694,9 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
     return () => {
       stopRaf();
       disconnectAllStreams();
-      const engine = engineRef.current;
+      const singleton = engineSingletonRef.current;
+      const engine = engineRef.current ?? singleton?.peek() ?? null;
+      singleton?.clear();
       engineRef.current = null;
       if (engine) {
         void engine.dispose();
