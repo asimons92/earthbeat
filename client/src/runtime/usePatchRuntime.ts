@@ -29,6 +29,12 @@ import {
 } from './patchTransport';
 import { PLAYBACK_SPEED_DEFAULT, monitorPlaybackSpeed } from './playbackSpeed';
 import {
+  monitorHistoryKeyFromClock,
+  shouldAppendMonitorHistory,
+  shouldPublishUiAt,
+  type MonitorHistoryKey,
+} from './playbackPublish';
+import {
   resolveVoiceParams,
   type ConnectorSample,
 } from './resolveVoiceParams';
@@ -129,6 +135,10 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   const monitorClocksByKindRef = useRef<Map<string, ConnectorClock>>(new Map());
   const rafRef = useRef<number | null>(null);
   const lastFrameMsRef = useRef<number | null>(null);
+  const lastUiPublishMsRef = useRef<number | null>(null);
+  const monitorHistoryKeysRef = useRef<Map<string, MonitorHistoryKey>>(new Map());
+  const voiceApplyInFlightRef = useRef(false);
+  const voiceApplyQueuedRef = useRef(false);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
   const transportRef = useRef(transport);
@@ -217,6 +227,24 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
     }
   }, []);
 
+  const scheduleVoiceApply = useCallback(() => {
+    if (voiceApplyInFlightRef.current) {
+      voiceApplyQueuedRef.current = true;
+      return;
+    }
+    voiceApplyInFlightRef.current = true;
+    void (async () => {
+      try {
+        do {
+          voiceApplyQueuedRef.current = false;
+          await applySamplesToVoices();
+        } while (voiceApplyQueuedRef.current);
+      } finally {
+        voiceApplyInFlightRef.current = false;
+      }
+    })();
+  }, [applySamplesToVoices]);
+
   const tickPlayback = useCallback(
     (nowMs: number) => {
       const holding = shouldHoldSharedStream(transportRef.current);
@@ -230,6 +258,7 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
 
       let samples = samplesByConnectorRef.current;
       const kindSamples: Partial<Record<string, ConnectorSample>> = {};
+      const historySamples: ConnectorSample[] = [];
 
       for (const node of nodesRef.current) {
         if (node.type !== 'connector') continue;
@@ -299,28 +328,40 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         const sample = sampleFromKindSnapshot(snapshot, clock);
         if (sample) {
           kindSamples[kindKey] = sample;
+          const historyKey = monitorHistoryKeyFromClock(clock);
+          const previousKey = monitorHistoryKeysRef.current.get(kindKey);
+          if (shouldAppendMonitorHistory(previousKey, historyKey)) {
+            monitorHistoryKeysRef.current.set(kindKey, historyKey);
+            historySamples.push(sample);
+          }
         }
       }
 
       samplesByConnectorRef.current = samples;
+      // Clocks and voice params stay on every animation frame.
+      scheduleVoiceApply();
 
-      if (Object.keys(kindSamples).length > 0) {
-        setLastSamplesByKind((prev) => ({ ...prev, ...kindSamples }));
-        const anySample = Object.values(kindSamples)[0];
-        if (anySample) setLastSample(anySample);
+      if (historySamples.length > 0) {
         setSampleHistoryByStripId((prev) => {
           let next = prev;
-          for (const sample of Object.values(kindSamples)) {
-            if (!sample) continue;
+          for (const sample of historySamples) {
             next = appendSampleToHistory(next, stripsRef.current, sample);
           }
           return next;
         });
       }
 
-      void applySamplesToVoices();
+      if (
+        Object.keys(kindSamples).length > 0 &&
+        shouldPublishUiAt(nowMs, lastUiPublishMsRef.current)
+      ) {
+        lastUiPublishMsRef.current = nowMs;
+        setLastSamplesByKind((prev) => ({ ...prev, ...kindSamples }));
+        const anySample = Object.values(kindSamples)[0];
+        if (anySample) setLastSample(anySample);
+      }
     },
-    [applySamplesToVoices],
+    [scheduleVoiceApply],
   );
 
   const stopRaf = useCallback(() => {
@@ -329,6 +370,7 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
       rafRef.current = null;
     }
     lastFrameMsRef.current = null;
+    lastUiPublishMsRef.current = null;
   }, []);
 
   const startRaf = useCallback(() => {
@@ -520,6 +562,8 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
           monitorClocksByKindRef.current.set(kind, setClockPlaying(clock, false));
         }
         samplesByConnectorRef.current = emptyConnectorSamples();
+        monitorHistoryKeysRef.current.clear();
+        lastUiPublishMsRef.current = null;
         setLastSamplesByKind({});
         setLastSample(null);
         setSampleHistoryByStripId(emptySampleHistory());
@@ -596,6 +640,8 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   const resetTransportForPatchLoad = useCallback(() => {
     clocksByConnectorRef.current.clear();
     monitorClocksByKindRef.current.clear();
+    monitorHistoryKeysRef.current.clear();
+    lastUiPublishMsRef.current = null;
     snapshotsByKindRef.current = {};
     samplesByConnectorRef.current = emptyConnectorSamples();
     dispatchTransport(transportEventForPatchLoad());
@@ -632,8 +678,8 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
   useEffect(() => {
     if (!shouldHoldSharedStream(transport)) return;
     syncStreams();
-    void applySamplesToVoices();
-  }, [nodes, edges, transport, applySamplesToVoices, syncStreams]);
+    scheduleVoiceApply();
+  }, [nodes, edges, transport, scheduleVoiceApply, syncStreams]);
 
   useEffect(() => {
     return () => {

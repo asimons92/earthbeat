@@ -17,4 +17,4 @@ A multiplier is one control for all kinds. Client clocks let two nodes of the sa
 
 ## Follow-up
 
-Shipped: client-owned clocks, SSE `series`/`queue` snapshots, Connector `playbackSpeed` field, catalog `defaultLoopSeconds`, Monitor at speed 1. Constraint tests under `client/src/runtime/playbackSpeed.test.ts`, `connectorClock.test.ts`, and `connectorSamples.test.ts`.
+Shipped: client-owned clocks, SSE `series`/`queue` snapshots, Connector `playbackSpeed` field, catalog `defaultLoopSeconds`, Monitor at speed 1. Constraint tests under `client/src/runtime/playbackSpeed.test.ts`, `connectorClock.test.ts`, and `connectorSamples.test.ts`. UI publish rate capped in `2026-09-06-raf-ui-publish-cap.md`.
