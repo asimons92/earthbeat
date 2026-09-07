@@ -38,3 +38,27 @@ export function clampMix(mix: number): number {
   if (!Number.isFinite(mix)) return MIX_DEFAULT;
   return Math.min(MIX_MAX, Math.max(MIX_MIN, mix));
 }
+
+/** Round Drive to one decimal (matches inspector knob readout). */
+export function roundDrive(drive: number): number {
+  if (!Number.isFinite(drive)) return drive;
+  return Math.round(drive * 10) / 10;
+}
+
+/** Round Delay time to whole milliseconds. */
+export function roundTimeMs(timeMs: number): number {
+  if (!Number.isFinite(timeMs)) return timeMs;
+  return Math.round(timeMs);
+}
+
+/** Round Feedback to two decimals. */
+export function roundFeedback(feedback: number): number {
+  if (!Number.isFinite(feedback)) return feedback;
+  return Math.round(feedback * 100) / 100;
+}
+
+/** Round Mix to two decimals. */
+export function roundMix(mix: number): number {
+  if (!Number.isFinite(mix)) return mix;
+  return Math.round(mix * 100) / 100;
+}

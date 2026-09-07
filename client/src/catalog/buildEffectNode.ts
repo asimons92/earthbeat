@@ -1,4 +1,9 @@
 import { effectDefaults, getEffectKind, scaleSnapScales } from '@/generated/catalog';
+import {
+  roundDrive,
+  roundFeedback,
+  roundTimeMs,
+} from '@/runtime/audioFxParams';
 
 import { resolveConnectorKind } from './resolveConnectorKind';
 
@@ -49,10 +54,10 @@ export function effectStatusLine(data: {
   const transforms = kind?.transforms ?? [];
   if (transforms.some((entry) => entry === 'audio')) {
     if (data.kindKey === 'distortion') {
-      return `drive ${data.drive}`;
+      return `drive ${roundDrive(data.drive)}`;
     }
     if (data.kindKey === 'delay') {
-      return `${data.timeMs}ms fb ${data.feedback}`;
+      return `${roundTimeMs(data.timeMs)}ms fb ${roundFeedback(data.feedback)}`;
     }
   }
   const scale = scaleSnapScales.find((entry) => entry.key === data.scaleKey);

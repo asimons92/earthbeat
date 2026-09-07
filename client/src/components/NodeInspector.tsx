@@ -5,6 +5,7 @@ import { Knob } from '@/components/Knob';
 import { Button } from '@/components/ui/button';
 import { ModulatorTransferCurve } from '@/components/ModulatorTransferCurve';
 import { effectStatusLine } from '@/catalog/buildEffectNode';
+import { formatModulatorStatus, roundModulatorValue } from '@/catalog/modulatorDisplay';
 import { formatOscillatorHzStatus, roundFrequencyHz } from '@/catalog/oscillatorHz';
 import { oscillatorLabel } from '@/catalog/oscillatorLabel';
 import { Label } from '@/components/ui/label';
@@ -47,6 +48,10 @@ import {
   clampFeedback,
   clampMix,
   clampTimeMs,
+  roundDrive,
+  roundFeedback,
+  roundMix,
+  roundTimeMs,
 } from '@/runtime/audioFxParams';
 import { toRuntimeEdges, toRuntimeNodes } from '@/runtime/runtimeNodes';
 
@@ -63,11 +68,7 @@ function modulatorStatus(data: {
   outMin: number;
   outMax: number;
 }) {
-  const outIsRatio = data.targetParam === 'frequencyHz';
-  const outRange = outIsRatio
-    ? `${data.outMin}×–${data.outMax}×`
-    : `${data.outMin}–${data.outMax}`;
-  return `${data.inMin}–${data.inMax} → ${outRange}`;
+  return formatModulatorStatus(data);
 }
 
 function modulatorLabel(channelKey: string, targetParam: string) {
@@ -327,7 +328,7 @@ export function NodeInspector({
               max={xLock?.max ?? data.inMin}
               disabled={!xLock || xLock.min >= xLock.max}
               decimals={2}
-              onChange={(inMin) => patchModulator({ inMin })}
+              onChange={(inMin) => patchModulator({ inMin: roundModulatorValue(inMin) })}
             />
           </div>
           <div className="inspector__field">
@@ -339,7 +340,7 @@ export function NodeInspector({
               max={xLock?.max ?? data.inMax}
               disabled={!xLock || xLock.min >= xLock.max}
               decimals={2}
-              onChange={(inMax) => patchModulator({ inMax })}
+              onChange={(inMax) => patchModulator({ inMax: roundModulatorValue(inMax) })}
             />
           </div>
         </div>
@@ -356,7 +357,7 @@ export function NodeInspector({
               max={yLock?.max ?? data.outMin}
               disabled={!yLock || yLock.min >= yLock.max}
               decimals={2}
-              onChange={(outMin) => patchModulator({ outMin })}
+              onChange={(outMin) => patchModulator({ outMin: roundModulatorValue(outMin) })}
             />
           </div>
           <div className="inspector__field">
@@ -370,7 +371,7 @@ export function NodeInspector({
               max={yLock?.max ?? data.outMax}
               disabled={!yLock || yLock.min >= yLock.max}
               decimals={2}
-              onChange={(outMax) => patchModulator({ outMax })}
+              onChange={(outMax) => patchModulator({ outMax: roundModulatorValue(outMax) })}
             />
           </div>
         </div>
@@ -569,7 +570,9 @@ export function NodeInspector({
               min={DRIVE_MIN}
               max={DRIVE_MAX}
               decimals={1}
-              onChange={(drive) => patchEffect({ drive: clampDrive(drive) })}
+              onChange={(drive) =>
+                patchEffect({ drive: roundDrive(clampDrive(drive)) })
+              }
             />
           </div>
         ) : null}
@@ -583,7 +586,9 @@ export function NodeInspector({
                 min={TIME_MS_MIN}
                 max={TIME_MS_MAX}
                 decimals={0}
-                onChange={(timeMs) => patchEffect({ timeMs: clampTimeMs(timeMs) })}
+                onChange={(timeMs) =>
+                  patchEffect({ timeMs: roundTimeMs(clampTimeMs(timeMs)) })
+                }
               />
             </div>
             <div className="inspector__field">
@@ -594,7 +599,9 @@ export function NodeInspector({
                 min={FEEDBACK_MIN}
                 max={FEEDBACK_MAX}
                 decimals={2}
-                onChange={(feedback) => patchEffect({ feedback: clampFeedback(feedback) })}
+                onChange={(feedback) =>
+                  patchEffect({ feedback: roundFeedback(clampFeedback(feedback)) })
+                }
               />
             </div>
             <div className="inspector__field">
@@ -605,7 +612,7 @@ export function NodeInspector({
                 min={MIX_MIN}
                 max={MIX_MAX}
                 decimals={2}
-                onChange={(mix) => patchEffect({ mix: clampMix(mix) })}
+                onChange={(mix) => patchEffect({ mix: roundMix(clampMix(mix)) })}
               />
             </div>
           </>

@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { effectStatusLine } from '@/catalog/buildEffectNode';
+import { formatModulatorStatus } from '@/catalog/modulatorDisplay';
 import { formatOscillatorHzStatus } from '@/catalog/oscillatorHz';
 import { PLAYBACK_SPEED_DEFAULT } from '@/runtime/playbackSpeed';
 
@@ -196,7 +197,7 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
         inMax: row.inMax,
         outMin: row.outMin,
         outMax: row.outMax,
-        status: `${row.inMin}–${row.inMax} → ${row.outMin}×–${row.outMax}×`,
+        status: formatModulatorStatus(row),
       },
     })),
     ...graph.oscillators.map((row) => ({

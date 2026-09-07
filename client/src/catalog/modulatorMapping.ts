@@ -1,3 +1,8 @@
+import {
+  formatModulatorStatus,
+  type ModulatorStatusRanges,
+} from './modulatorDisplay';
+
 export type ModulatorMappingData = {
   label: string;
   channelKey: string;
@@ -53,13 +58,17 @@ function refreshPresentation(
   const left = channel?.label ?? data.channelKey;
   const right = target?.label ?? data.targetParam;
   const outIsRatio = target?.modulationKind === 'ratio' || data.targetParam === 'frequencyHz';
-  const outRange = outIsRatio
-    ? `${data.outMin}×–${data.outMax}×`
-    : `${data.outMin}–${data.outMax}`;
+  const ranges: ModulatorStatusRanges = {
+    inMin: data.inMin,
+    inMax: data.inMax,
+    outMin: data.outMin,
+    outMax: data.outMax,
+    targetParam: outIsRatio ? 'frequencyHz' : data.targetParam,
+  };
   return {
     ...data,
     label: `${left} → ${right}`,
-    status: `${data.inMin}–${data.inMax} → ${outRange}`,
+    status: formatModulatorStatus(ranges),
   };
 }
 
