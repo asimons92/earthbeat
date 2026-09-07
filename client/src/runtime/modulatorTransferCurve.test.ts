@@ -200,7 +200,9 @@ describe('transferCurveAnchors', () => {
         const options = { xLock, yLock, padFraction: DOMAIN_PAD_FRACTION };
         const anchors = transferCurveAnchors(ranges, options);
         const { xDomain } = transferCurveDomains(ranges, options);
-        const expectedXs = [xDomain.min, ranges.inMin, ranges.inMax, xDomain.max];
+        const kneeLo = Math.min(ranges.inMin, ranges.inMax);
+        const kneeHi = Math.max(ranges.inMin, ranges.inMax);
+        const expectedXs = [xDomain.min, kneeLo, kneeHi, xDomain.max];
         expect(anchors.map((anchor) => anchor.x)).toEqual(expectedXs);
         for (const anchor of anchors) {
           expect(anchor.y).toBe(
@@ -212,6 +214,21 @@ describe('transferCurveAnchors', () => {
               ranges.outMax,
             ),
           );
+        }
+      }),
+    );
+  });
+
+  it('keeps ascending X so inverted in ranges do not draw a Z', () => {
+    fc.assert(
+      fc.property(rangesArb, lockArb, lockArb, (ranges, xLock, yLock) => {
+        const anchors = transferCurveAnchors(ranges, {
+          xLock,
+          yLock,
+          padFraction: DOMAIN_PAD_FRACTION,
+        });
+        for (let i = 1; i < anchors.length; i += 1) {
+          expect(anchors[i]!.x).toBeGreaterThanOrEqual(anchors[i - 1]!.x);
         }
       }),
     );

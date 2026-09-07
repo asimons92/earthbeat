@@ -139,14 +139,17 @@ export function transferCurveLivePoint(
 
 /**
  * Four data-space anchors for the clamp shelves and linear segment.
- * Y at each X equals mapRange.
+ * Knees are sorted by ascending X so inverted inMin/inMax still draw one
+ * left-to-right transfer curve (no Z). Y at each X equals mapRange.
  */
 export function transferCurveAnchors(
   ranges: TransferCurveRanges,
   options: TransferCurveDomainOptions = {},
 ): TransferCurvePoint[] {
   const { xDomain } = transferCurveDomains(ranges, options);
-  const xs = [xDomain.min, ranges.inMin, ranges.inMax, xDomain.max];
+  const kneeLo = Math.min(ranges.inMin, ranges.inMax);
+  const kneeHi = Math.max(ranges.inMin, ranges.inMax);
+  const xs = [xDomain.min, kneeLo, kneeHi, xDomain.max];
   return xs.map((x) => ({
     x,
     y: mapRange(x, ranges.inMin, ranges.inMax, ranges.outMin, ranges.outMax),
