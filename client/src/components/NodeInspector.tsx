@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 import { Button } from '@/components/ui/button';
+import { ModulatorTransferCurve } from '@/components/ModulatorTransferCurve';
 import { effectStatusLine } from '@/catalog/buildEffectNode';
 import { oscillatorLabel } from '@/catalog/oscillatorLabel';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import {
   usgsConnector,
 } from '@/generated/catalog';
 import { audioFxIssueLabelsByNodeId } from '@/runtime/audioFxChain';
+import { channelFromSample, type ConnectorSample } from '@/runtime/channelFromSample';
 import {
   PLAYBACK_SPEED_DEFAULT,
   PLAYBACK_SPEED_MAX,
@@ -89,6 +91,7 @@ type NodeInspectorProps = {
   nodes: Node[];
   edges: Edge[];
   selectedNodeId: string | null;
+  lastSamplesByKind: Partial<Record<string, ConnectorSample>>;
   onChangeNodeData: (nodeId: string, data: Record<string, unknown>) => void;
   onRemoveNode: (nodeId: string) => void;
 };
@@ -118,6 +121,7 @@ export function NodeInspector({
   nodes,
   edges,
   selectedNodeId,
+  lastSamplesByKind,
   onChangeNodeData,
   onRemoveNode,
 }: NodeInspectorProps) {
@@ -194,6 +198,37 @@ export function NodeInspector({
       onChangeNodeData(selected.id, next);
     };
 
+    let channelValue: number | null = null;
+    if (upstreamConnector && data.channelKey.length > 0) {
+      const kindKey = String(upstreamConnector.data.kindKey ?? '');
+      const sample = lastSamplesByKind[kindKey];
+      if (sample) {
+        const interpolate = upstreamConnector.data.interpolate !== false;
+        channelValue = channelFromSample(sample, data.channelKey, { interpolate });
+      }
+    }
+
+    const selectedChannel = channelOptions.find((entry) => entry.key === data.channelKey);
+    const xLock = selectedChannel
+      ? {
+          min:
+            'mapHintMin' in selectedChannel && selectedChannel.mapHintMin != null
+              ? Number(selectedChannel.mapHintMin)
+              : Number(selectedChannel.min),
+          max:
+            'mapHintMax' in selectedChannel && selectedChannel.mapHintMax != null
+              ? Number(selectedChannel.mapHintMax)
+              : Number(selectedChannel.max),
+        }
+      : null;
+    const selectedTarget = targetOptions.find((entry) => entry.key === data.targetParam);
+    const yLock = selectedTarget
+      ? {
+          min: selectedTarget.modulationOutMin,
+          max: selectedTarget.modulationOutMax,
+        }
+      : null;
+
     return (
       <aside className="shell__inspector" aria-label="Node inspector">
         <div className="inspector__title">Modulator</div>
@@ -250,6 +285,23 @@ export function NodeInspector({
             <p className="inspector__empty">Wire this Modulator into an Oscillator (Effects allowed in between).</p>
           )}
         </div>
+
+        <ModulatorTransferCurve
+          inMin={data.inMin}
+          inMax={data.inMax}
+          outMin={data.outMin}
+          outMax={data.outMax}
+          channelValue={channelValue}
+          yAxisIsRatio={data.targetParam === 'frequencyHz'}
+          xLock={xLock}
+          yLock={yLock}
+          xAxisLabel={selectedChannel?.label ?? 'Channel'}
+          yAxisLabel={
+            data.targetParam === 'frequencyHz'
+              ? 'Ratio'
+              : (selectedTarget?.label ?? 'Output')
+          }
+        />
 
         <div className="inspector__row">
           <div className="inspector__field">

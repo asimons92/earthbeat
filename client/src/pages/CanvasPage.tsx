@@ -35,6 +35,7 @@ export function CanvasPage() {
     onSelectionChange,
     onChangeNodeData,
     removeNode,
+    lastSamplesByKind,
   } = usePatchWorkspace();
 
   return (
@@ -69,6 +70,7 @@ export function CanvasPage() {
         nodes={nodes}
         edges={edges}
         selectedNodeId={selectedNodeId}
+        lastSamplesByKind={lastSamplesByKind}
         onChangeNodeData={onChangeNodeData}
         onRemoveNode={removeNode}
       />

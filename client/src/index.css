@@ -380,6 +380,52 @@ body,
   gap: 0.5rem;
 }
 
+.inspector__transfer {
+  width: 100%;
+}
+
+.inspector__transfer-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--ink);
+}
+
+.inspector__transfer-frame {
+  fill: var(--bg);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.inspector__transfer-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-opacity: 0.35;
+}
+
+.inspector__transfer-tick {
+  fill: var(--ink-muted);
+  font-size: 8px;
+}
+
+.inspector__transfer-axis-label {
+  fill: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.inspector__transfer-curve {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.inspector__transfer-point {
+  fill: var(--live);
+  stroke: var(--bg);
+  stroke-width: 1;
+}
+
 .inspector__readonly {
   margin: 0;
   font-size: 0.85rem;
