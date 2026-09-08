@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { applyAudioFxChain } from './audioFxBake';
 import type { AudioFxStep } from './audioFxChain';
 import {
+  clampCutoffHz,
   clampDrive,
   clampFeedback,
   DRIVE_MAX,
@@ -141,6 +142,60 @@ describe('applyAudioFxChain', () => {
           const forward = elemNodeHash(applyAudioFxChain(dryTone, [dist, del]));
           const reverse = elemNodeHash(applyAudioFxChain(dryTone, [del, dist]));
           expect(forward).not.toBe(reverse);
+        },
+      ),
+    );
+  });
+
+  it('changes the tone hash when filter cutoff or Q changes', () => {
+    fc.assert(
+      fc.property(
+        idArb,
+        fc.constantFrom('lowpass', 'highpass', 'bandpass') as fc.Arbitrary<
+          'lowpass' | 'highpass' | 'bandpass'
+        >,
+        fc.double({ min: 80, max: 4000, noNaN: true }),
+        fc.double({ min: 80, max: 4000, noNaN: true }),
+        fc.double({ min: 0.2, max: 8, noNaN: true }),
+        (id, kind, cutoffA, cutoffB, q) => {
+          fc.pre(clampCutoffHz(cutoffA) !== clampCutoffHz(cutoffB));
+          const stepA: AudioFxStep = {
+            id,
+            kind,
+            enabled: true,
+            cutoffHz: cutoffA,
+            q,
+          };
+          const stepB: AudioFxStep = { ...stepA, cutoffHz: cutoffB };
+          expect(elemNodeHash(applyAudioFxChain(dryTone, [stepA]))).not.toBe(
+            elemNodeHash(applyAudioFxChain(dryTone, [stepB])),
+          );
+        },
+      ),
+    );
+  });
+
+  it('leaves the dry tone when ADSR is bypassed and changes it when enabled with a non-zero gate', () => {
+    fc.assert(
+      fc.property(
+        idArb,
+        fc.double({ min: 0.001, max: 0.2, noNaN: true }),
+        fc.double({ min: 0.01, max: 0.5, noNaN: true }),
+        (id, attackSec, decaySec) => {
+          const bypassed: AudioFxStep = {
+            id,
+            kind: 'adsr',
+            enabled: false,
+            attackSec,
+            decaySec,
+            sustain: 0,
+            releaseSec: 0.05,
+            gate: 1,
+          };
+          const open: AudioFxStep = { ...bypassed, enabled: true, gate: 1 };
+          const dryHash = elemNodeHash(dryTone);
+          expect(elemNodeHash(applyAudioFxChain(dryTone, [bypassed]))).toBe(dryHash);
+          expect(elemNodeHash(applyAudioFxChain(dryTone, [open]))).not.toBe(dryHash);
         },
       ),
     );

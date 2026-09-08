@@ -2,19 +2,24 @@
   const kinds = catalog.connectorKinds || [];
   const effectKinds = catalog.effectKinds || [];
   const oscillator = (types || []).find((entry) => entry.name === 'Oscillator');
+  const effectType = (types || []).find((entry) => entry.name === 'Effect');
+  const mapModulatable = (field) => ({
+    key: field.name,
+    label: field.label || helpers.startCase(field.name),
+    min: field.min,
+    max: field.max,
+    modulationKind: field.modulationKind || 'absolute',
+    modulationOutMin:
+      field.modulationOutMin !== undefined ? field.modulationOutMin : field.min,
+    modulationOutMax:
+      field.modulationOutMax !== undefined ? field.modulationOutMax : field.max,
+  });
   const oscillatorModulatableParams = (oscillator?.fields || [])
     .filter((field) => field.modulatable)
-    .map((field) => ({
-      key: field.name,
-      label: field.label || helpers.startCase(field.name),
-      min: field.min,
-      max: field.max,
-      modulationKind: field.modulationKind || 'absolute',
-      modulationOutMin:
-        field.modulationOutMin !== undefined ? field.modulationOutMin : field.min,
-      modulationOutMax:
-        field.modulationOutMax !== undefined ? field.modulationOutMax : field.max,
-    }));
+    .map(mapModulatable);
+  const effectModulatableParams = (effectType?.fields || [])
+    .filter((field) => field.modulatable)
+    .map(mapModulatable);
   const waveformField = (oscillator?.fields || []).find((field) => field.name === 'waveform');
   const oscillatorWaveforms = (waveformField?.enum || []).map((key) => ({
     key,
@@ -62,6 +67,8 @@ export const modulatorDefaults = <%- dump(catalog.modulatorDefaults) %> as const
 
 export const oscillatorModulatableParams = <%- dump(oscillatorModulatableParams) %> as const;
 
+export const effectModulatableParams = <%- dump(effectModulatableParams) %> as const;
+
 export const shellCreateActions = <%- dump(shell.createActions || []) %> as const;
 
 export const shellPaletteCategories = <%- dump(shell.paletteCategories || []) %> as const;
@@ -92,4 +99,14 @@ export function modulatableChannelsForKind(kindKey: string) {
   const kind = getConnectorKind(kindKey);
   if (!kind) return [];
   return kind.channels.filter((channel) => channel.modulatable);
+}
+
+/** Modulatable Effect params for one EffectKind (empty for Scale Snap). */
+export function modulatableParamsForEffectKind(kindKey: string) {
+  const kind = getEffectKind(kindKey);
+  if (!kind) return [];
+  const keys = new Set(
+    ('modulatableParamKeys' in kind ? kind.modulatableParamKeys : []) as readonly string[],
+  );
+  return effectModulatableParams.filter((param) => keys.has(param.key));
 }

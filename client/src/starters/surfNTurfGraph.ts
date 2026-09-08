@@ -142,7 +142,14 @@ export const SURF_N_TURF_GRAPH: DomainGraph = {
       "drive": 2,
       "timeMs": 250,
       "feedback": 0.35,
-      "mix": 0.35
+      "mix": 0.35,
+      "cutoffHz": 1000,
+      "q": 0.707,
+      "attackSec": 0.005,
+      "decaySec": 0.15,
+      "sustain": 0,
+      "releaseSec": 0.05,
+      "gate": 0
     },
     {
       "id": "effect-31235e2e-ee88-421a-a039-d625c8cb87bf",
@@ -158,7 +165,14 @@ export const SURF_N_TURF_GRAPH: DomainGraph = {
       "drive": 2,
       "timeMs": 250,
       "feedback": 0.35,
-      "mix": 0.35
+      "mix": 0.35,
+      "cutoffHz": 1000,
+      "q": 0.707,
+      "attackSec": 0.005,
+      "decaySec": 0.15,
+      "sustain": 0,
+      "releaseSec": 0.05,
+      "gate": 0
     },
     {
       "id": "effect-f4088bb6-c99a-4c4b-8b02-fac367d2b8b0",
@@ -174,7 +188,14 @@ export const SURF_N_TURF_GRAPH: DomainGraph = {
       "drive": 2,
       "timeMs": 250,
       "feedback": 0.35,
-      "mix": 0.35
+      "mix": 0.35,
+      "cutoffHz": 1000,
+      "q": 0.707,
+      "attackSec": 0.005,
+      "decaySec": 0.15,
+      "sustain": 0,
+      "releaseSec": 0.05,
+      "gate": 0
     },
     {
       "id": "effect-d2fac549-fcb8-425c-9154-d1146a7b6cd4",
@@ -190,7 +211,14 @@ export const SURF_N_TURF_GRAPH: DomainGraph = {
       "drive": 2,
       "timeMs": 250,
       "feedback": 0.35,
-      "mix": 0.35
+      "mix": 0.35,
+      "cutoffHz": 1000,
+      "q": 0.707,
+      "attackSec": 0.005,
+      "decaySec": 0.15,
+      "sustain": 0,
+      "releaseSec": 0.05,
+      "gate": 0
     },
     {
       "id": "effect-e6e6cdf6-1bee-48f9-b97c-b11ad952ff1d",
@@ -206,7 +234,14 @@ export const SURF_N_TURF_GRAPH: DomainGraph = {
       "drive": 2,
       "timeMs": 250,
       "feedback": 0.35,
-      "mix": 0.35
+      "mix": 0.35,
+      "cutoffHz": 1000,
+      "q": 0.707,
+      "attackSec": 0.005,
+      "decaySec": 0.15,
+      "sustain": 0,
+      "releaseSec": 0.05,
+      "gate": 0
     },
     {
       "id": "effect-62e4e672-ab1e-47c5-a42b-aa7b42e733f6",
@@ -222,7 +257,14 @@ export const SURF_N_TURF_GRAPH: DomainGraph = {
       "drive": 2,
       "timeMs": 250,
       "feedback": 0.6,
-      "mix": 0.35
+      "mix": 0.35,
+      "cutoffHz": 1000,
+      "q": 0.707,
+      "attackSec": 0.005,
+      "decaySec": 0.15,
+      "sustain": 0,
+      "releaseSec": 0.05,
+      "gate": 0
     },
     {
       "id": "effect-b9c1fc63-de97-46a9-83a6-f14fdea7332e",
@@ -238,7 +280,14 @@ export const SURF_N_TURF_GRAPH: DomainGraph = {
       "drive": 2,
       "timeMs": 1000,
       "feedback": 0.6,
-      "mix": 0.35
+      "mix": 0.35,
+      "cutoffHz": 1000,
+      "q": 0.707,
+      "attackSec": 0.005,
+      "decaySec": 0.15,
+      "sustain": 0,
+      "releaseSec": 0.05,
+      "gate": 0
     }
   ],
   "wires": [

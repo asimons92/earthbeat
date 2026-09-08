@@ -5,6 +5,7 @@ import { getConnectorKind, oscillatorDefaults } from '@/generated/catalog';
 
 import { createPatchAudioEngine, type PatchAudioEngine } from './audioEngine';
 import { audioFxFingerprint, resolveOutboundAudioFxChain } from './audioFxChain';
+import { applyEffectModulationToSteps } from './resolveEffectModulation';
 import { createSingletonAsync, type SingletonAsync } from './singletonAsync';
 import {
   advanceQueueClock,
@@ -208,7 +209,14 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         typeof osc?.data.waveform === 'string' ? osc.data.waveform : oscillatorDefaults.waveform;
       if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) continue;
       const fxChain = resolveOutboundAudioFxChain(runtimeNodes, runtimeEdges, oscillatorId);
-      const fxSteps = fxChain.ok ? fxChain.steps : [];
+      const restingFxSteps = fxChain.ok ? fxChain.steps : [];
+      const fxSteps = applyEffectModulationToSteps(
+        restingFxSteps,
+        runtimeNodes,
+        runtimeEdges,
+        samplesByConnectorRef.current,
+        engine.ctx.sampleRate,
+      );
       const fxFp = audioFxFingerprint(fxSteps);
       const voice = await engine.ensureVoice(
         oscillatorId,
@@ -227,6 +235,7 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
         await voice.setFrequency(applyPlan.frequencyHz);
       }
       await voice.setGain(applyPlan.gain);
+      await voice.setAudioFxParams(fxSteps);
       if (!canApplyVoice(transportRef.current.playingOscillatorIds, oscillatorId)) {
         await engine.removeVoice(oscillatorId);
         continue;

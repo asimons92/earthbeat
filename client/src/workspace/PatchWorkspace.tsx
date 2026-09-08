@@ -33,6 +33,7 @@ import {
   connectorKindsByKey,
   effectKindsByKey,
   modulatableChannelsForKind,
+  modulatableParamsForEffectKind,
   oscillatorDefaults,
   oscillatorModulatableParams,
   oscillatorWaveforms,
@@ -47,7 +48,7 @@ import { audioFxIssueLabelsByNodeId } from '@/runtime/audioFxChain';
 import { toRuntimeEdges, toRuntimeNodes } from '@/runtime/runtimeNodes';
 
 import { isValidPatchConnection } from './isValidPatchConnection';
-
+import { isModTargetHandle } from './patchWireRules';
 function nextOffset(count: number) {
   return { x: 60 + (count % 5) * 36, y: 60 + (count % 5) * 36 };
 }
@@ -63,13 +64,25 @@ function channelOptionsForKind(kindKey: string): ModulatorChannelOption[] {
   }));
 }
 
-const targetOptions: ModulatorTargetOption[] = oscillatorModulatableParams.map((param) => ({
-  key: param.key,
-  label: param.label,
-  modulationOutMin: param.modulationOutMin,
-  modulationOutMax: param.modulationOutMax,
-  modulationKind: param.modulationKind,
-}));
+const oscillatorTargetOptions: ModulatorTargetOption[] = oscillatorModulatableParams.map(
+  (param) => ({
+    key: param.key,
+    label: param.label,
+    modulationOutMin: param.modulationOutMin,
+    modulationOutMax: param.modulationOutMax,
+    modulationKind: param.modulationKind,
+  }),
+);
+
+function targetOptionsForEffectKind(kindKey: string): ModulatorTargetOption[] {
+  return modulatableParamsForEffectKind(kindKey).map((param) => ({
+    key: param.key,
+    label: param.label,
+    modulationOutMin: param.modulationOutMin,
+    modulationOutMax: param.modulationOutMax,
+    modulationKind: param.modulationKind,
+  }));
+}
 
 function walkDownstreamOscillator(
   startId: string,
@@ -81,7 +94,9 @@ function walkDownstreamOscillator(
   while (true) {
     if (visited.has(cursor)) return null;
     visited.add(cursor);
-    const outbound = edges.find((edge) => edge.source === cursor);
+    const outbound = edges.find(
+      (edge) => edge.source === cursor && !isModTargetHandle(edge.targetHandle),
+    );
     if (!outbound) return null;
     const next = nodes.find((entry) => entry.id === outbound.target);
     if (!next) return null;
@@ -92,6 +107,20 @@ function walkDownstreamOscillator(
     }
     return null;
   }
+}
+
+function walkDownstreamEffectOnMod(
+  startId: string,
+  nodes: Node[],
+  edges: Edge[],
+): Node | null {
+  const outbound = edges.find(
+    (edge) => edge.source === startId && isModTargetHandle(edge.targetHandle),
+  );
+  if (!outbound) return null;
+  const next = nodes.find((entry) => entry.id === outbound.target);
+  if (!next || next.type !== 'effect') return null;
+  return next;
 }
 
 function applyModulatorAutofills(nodes: Node[], edges: Edge[]): Node[] {
@@ -106,11 +135,15 @@ function applyModulatorAutofills(nodes: Node[], edges: Edge[]): Node[] {
       upstream?.type === 'connector'
         ? channelOptionsForKind(String(upstream.data.kindKey ?? ''))
         : [];
+    const effectTarget = walkDownstreamEffectOnMod(node.id, nodes, edges);
+    const targets = effectTarget
+      ? targetOptionsForEffectKind(String(effectTarget.data.kindKey ?? ''))
+      : oscillatorTargetOptions;
     if (channels.length > 0) {
-      data = autofillModulatorChannel(data, channels, targetOptions);
+      data = autofillModulatorChannel(data, channels, targets);
     }
-    if (walkDownstreamOscillator(node.id, nodes, edges)) {
-      data = autofillModulatorTarget(data, targetOptions, channels);
+    if (effectTarget || walkDownstreamOscillator(node.id, nodes, edges)) {
+      data = autofillModulatorTarget(data, targets, channels);
     }
     return { ...node, data };
   });

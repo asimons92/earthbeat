@@ -193,6 +193,40 @@ describe('resolveOutboundAudioFxChain', () => {
     );
   });
 
+  it('ignores mod-handle inbound when checking audio signal fan-in', () => {
+    fc.assert(
+      fc.property(idArb, idArb, idArb, driveArb, (oscId, modId, distId, drive) => {
+        fc.pre(new Set([oscId, modId, distId]).size === 3);
+        const nodes = [
+          oscillator(oscId),
+          {
+            id: modId,
+            type: 'modulator' as const,
+            data: { channelKey: 'mag', targetParam: 'drive' },
+          },
+          distortion(distId, drive),
+        ];
+        const edges: RuntimeEdge[] = [
+          { id: `${oscId}-${distId}`, source: oscId, target: distId, targetHandle: 'in' },
+          {
+            id: `${modId}-${distId}`,
+            source: modId,
+            target: distId,
+            targetHandle: 'mod',
+          },
+        ];
+        const result = resolveOutboundAudioFxChain(nodes, edges, oscId);
+        const expectOk = edges.some((edge) => edge.targetHandle === 'mod');
+        expect(result.ok).toBe(expectOk);
+        expect(result.ok ? result.steps.map((step) => step.id) : []).toEqual(
+          edges
+            .filter((edge) => edge.source === oscId && edge.targetHandle === 'in')
+            .map((edge) => edge.target),
+        );
+      }),
+    );
+  });
+
   it('rejects fan-out from the Oscillator to two audio Effects', () => {
     fc.assert(
       fc.property(idArb, idArb, idArb, driveArb, timeMsArb, (oscId, distId, delayId, drive, timeMs) => {
@@ -254,7 +288,7 @@ describe('audioFxIssueLabelsByNodeId', () => {
 });
 
 describe('audioFxFingerprint', () => {
-  it('changes when a step param or enable flag changes', () => {
+  it('ignores live param values and changes when enable or kind identity changes', () => {
     fc.assert(
       fc.property(idArb, driveArb, driveArb, (id, driveA, driveB) => {
         fc.pre(driveA !== driveB);
@@ -266,7 +300,7 @@ describe('audioFxFingerprint', () => {
         };
         const stepB: AudioFxStep = { ...stepA, drive: driveB };
         const stepOff: AudioFxStep = { ...stepA, enabled: false };
-        expect(audioFxFingerprint([stepA])).not.toBe(audioFxFingerprint([stepB]));
+        expect(audioFxFingerprint([stepA])).toBe(audioFxFingerprint([stepB]));
         expect(audioFxFingerprint([stepA])).not.toBe(audioFxFingerprint([stepOff]));
       }),
     );

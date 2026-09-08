@@ -71,6 +71,13 @@ const graphArb: fc.Arbitrary<DomainGraph> = fc
         timeMs: 250,
         feedback: 0.35,
         mix: 0.35,
+        cutoffHz: 1000,
+        q: 0.707,
+        attackSec: 0.005,
+        decaySec: 0.15,
+        sustain: 0,
+        releaseSec: 0.05,
+        gate: 0,
       }));
       const wirePairs: Array<{ source: string; target: string }> = [];
       const c0 = connectorIds[0];

@@ -103,6 +103,20 @@ const effectSchema = graphNodeBase.extend({
 
   mix: z.number(),
 
+  cutoffHz: z.number(),
+
+  q: z.number(),
+
+  attackSec: z.number(),
+
+  decaySec: z.number(),
+
+  sustain: z.number(),
+
+  releaseSec: z.number(),
+
+  gate: z.number(),
+
 });
 
 const wireSchema = z.object({

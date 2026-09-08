@@ -12,6 +12,8 @@ export type RuntimeEdge = {
   id: string;
   source: string;
   target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
 };
 
 export type ModulationChain = {

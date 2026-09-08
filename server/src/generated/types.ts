@@ -147,6 +147,20 @@ export type Effect = {
 
   mix: number;
 
+  cutoffHz: number;
+
+  q: number;
+
+  attackSec: number;
+
+  decaySec: number;
+
+  sustain: number;
+
+  releaseSec: number;
+
+  gate: number;
+
 };
 
 

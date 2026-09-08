@@ -13,6 +13,13 @@ export type EffectNodeData = {
   timeMs: number;
   feedback: number;
   mix: number;
+  cutoffHz: number;
+  q: number;
+  attackSec: number;
+  decaySec: number;
+  sustain: number;
+  releaseSec: number;
+  gate: number;
   status: string;
 };
 
@@ -29,6 +36,7 @@ export function EffectNode({ data }: NodeProps<EffectFlowNode>) {
   return (
     <div className="graph-node graph-node--effect">
       <Handle type="target" position={Position.Left} id="in" />
+      <Handle type="target" position={Position.Top} id="mod" />
       <div className="graph-node__kind">Effect</div>
       <div className="graph-node__title">{data.label}</div>
       <div className="graph-node__status">{effectStatusDisplay(data)}</div>

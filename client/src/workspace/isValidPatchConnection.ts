@@ -5,6 +5,7 @@ import { getEffectKind } from '@/generated/catalog';
 import {
   canConnectPatchNodes,
   effectRoleFromTransforms,
+  isModTargetHandle,
   type PatchWireRole,
 } from './patchWireRules';
 
@@ -25,7 +26,7 @@ function isAudioEffectNode(node: Node | undefined): boolean {
   return roleForNode(node) === 'audio_effect';
 }
 
-/** React Flow isValidConnection using control vs audio Effect rules. */
+/** React Flow isValidConnection using control vs audio Effect rules and mod handles. */
 export function isValidPatchConnection(
   connection: Connection | Edge,
   nodes: Node[],
@@ -42,16 +43,31 @@ export function isValidPatchConnection(
   const targetRole = roleForNode(target);
   if (!sourceRole || !targetRole) return false;
 
-  const targetInboundCount = edges.filter((edge) => edge.target === targetId).length;
+  const targetHandle =
+    'targetHandle' in connection ? connection.targetHandle : undefined;
+
+  const targetSignalInboundCount = edges.filter((edge) => {
+    if (edge.target !== targetId) return false;
+    return !isModTargetHandle(edge.targetHandle);
+  }).length;
+
+  const targetModInboundCount = edges.filter((edge) => {
+    if (edge.target !== targetId) return false;
+    return isModTargetHandle(edge.targetHandle);
+  }).length;
+
   const sourceAudioOutboundCount = edges.filter((edge) => {
     if (edge.source !== sourceId) return false;
+    if (isModTargetHandle(edge.targetHandle)) return false;
     return isAudioEffectNode(byId.get(edge.target));
   }).length;
 
   return canConnectPatchNodes({
     sourceRole,
     targetRole,
-    targetInboundCount,
+    targetSignalInboundCount,
+    targetModInboundCount,
     sourceAudioOutboundCount,
+    targetHandle,
   });
 }

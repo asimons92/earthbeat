@@ -1,7 +1,11 @@
 import { el, type ElemNode } from '@elemaudio/core';
 import WebRenderer from '@elemaudio/web-renderer';
 
-import { applyAudioFxChain } from './audioFxBake';
+import {
+  applyAudioFxChain,
+  audioFxRefKey,
+  type AudioFxParamRefs,
+} from './audioFxBake';
 import type { AudioFxStep } from './audioFxChain';
 import {
   buildOscillatorTone,
@@ -12,9 +16,12 @@ import {
 } from './oscillatorTone';
 import { enqueueSerialTask } from './serialTaskQueue';
 
+type SetConstProps = (props: { value: number }) => Promise<void>;
+
 export type VoiceControls = {
   setFrequency: (freqHz: number) => Promise<void>;
   setGain: (gain: number) => Promise<void>;
+  setAudioFxParams: (steps: AudioFxStep[]) => Promise<void>;
 };
 
 export type PatchAudioEngine = {
@@ -39,13 +46,79 @@ export type PatchAudioEngine = {
 
 type VoiceState = {
   controls: VoiceControls;
-  setGainProps: (props: { value: number }) => Promise<void>;
+  setGainProps: SetConstProps;
   lastGain: number;
   audible: boolean;
   tone: ElemNode;
   waveform: string;
   fxFingerprint: string;
+  fxSetters: Map<string, SetConstProps>;
 };
+
+function collectStepParamEntries(step: AudioFxStep): Array<{ param: string; value: number }> {
+  if (step.kind === 'distortion') {
+    return [{ param: 'drive', value: step.drive }];
+  }
+  if (step.kind === 'delay') {
+    return [
+      { param: 'timeMs', value: step.timeMs },
+      { param: 'feedback', value: step.feedback },
+      { param: 'mix', value: step.mix },
+    ];
+  }
+  if (step.kind === 'lowpass' || step.kind === 'highpass' || step.kind === 'bandpass') {
+    return [
+      { param: 'cutoffHz', value: step.cutoffHz },
+      { param: 'q', value: step.q },
+    ];
+  }
+  if (step.kind === 'adsr') {
+    return [
+      { param: 'attackSec', value: step.attackSec },
+      { param: 'decaySec', value: step.decaySec },
+      { param: 'sustain', value: step.sustain },
+      { param: 'releaseSec', value: step.releaseSec },
+      { param: 'gate', value: step.gate },
+    ];
+  }
+  return [];
+}
+
+function createFxRefs(
+  core: WebRenderer,
+  steps: AudioFxStep[],
+): { refs: AudioFxParamRefs; setters: Map<string, SetConstProps> } {
+  const refs: AudioFxParamRefs = new Map();
+  const setters = new Map<string, SetConstProps>();
+  for (const step of steps) {
+    if (!step.enabled) continue;
+    for (const entry of collectStepParamEntries(step)) {
+      const key = audioFxRefKey(step.id, entry.param);
+      const [node, setProps] = core.createRef('const', { value: entry.value }, []) as [
+        ElemNode,
+        SetConstProps,
+      ];
+      refs.set(key, node);
+      setters.set(key, setProps);
+    }
+  }
+  return { refs, setters };
+}
+
+async function pushFxParams(
+  setters: Map<string, SetConstProps>,
+  steps: AudioFxStep[],
+): Promise<void> {
+  for (const step of steps) {
+    if (!step.enabled) continue;
+    for (const entry of collectStepParamEntries(step)) {
+      const key = audioFxRefKey(step.id, entry.param);
+      const setProps = setters.get(key);
+      if (!setProps) continue;
+      await setProps({ value: entry.value });
+    }
+  }
+}
 
 export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
   const ctx = new AudioContext();
@@ -93,14 +166,15 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     const resolvedWaveform = resolveOscillatorWaveform(waveform);
     const [freq, setFreqProps] = core.createRef('const', { value: initialFreqHz }, []) as [
       ElemNode,
-      (props: { value: number }) => Promise<void>,
+      SetConstProps,
     ];
     const [gain, setGainProps] = core.createRef('const', { value: initialGain }, []) as [
       ElemNode,
-      (props: { value: number }) => Promise<void>,
+      SetConstProps,
     ];
+    const { refs, setters } = createFxRefs(core, audioFxSteps);
     const dry = el.mul(buildOscillatorTone(resolvedWaveform, freq), gain);
-    const tone = applyAudioFxChain(dry, audioFxSteps, ctx.sampleRate);
+    const tone = applyAudioFxChain(dry, audioFxSteps, ctx.sampleRate, refs);
 
     const controls: VoiceControls = {
       setFrequency: async (freqHz) => {
@@ -119,6 +193,11 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
           await setGainProps({ value: nextGain });
         }
       },
+      setAudioFxParams: async (steps) => {
+        const voice = voices.get(oscillatorId);
+        if (!voice) return;
+        await pushFxParams(voice.fxSetters, steps);
+      },
     };
 
     voices.set(oscillatorId, {
@@ -129,6 +208,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
       tone,
       waveform: resolvedWaveform,
       fxFingerprint,
+      fxSetters: setters,
     });
 
     await enqueueRebuild();
@@ -152,6 +232,7 @@ export async function createPatchAudioEngine(): Promise<PatchAudioEngine> {
     );
 
     if (plan === 'reuse' && existing) {
+      await pushFxParams(existing.fxSetters, audioFxSteps);
       return existing.controls;
     }
 

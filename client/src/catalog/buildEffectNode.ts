@@ -1,7 +1,11 @@
 import { effectDefaults, getEffectKind, scaleSnapScales } from '@/generated/catalog';
 import {
+  roundCutoffHz,
   roundDrive,
+  roundEnvelopeSec,
   roundFeedback,
+  roundGate,
+  roundQ,
   roundTimeMs,
 } from '@/runtime/audioFxParams';
 
@@ -19,6 +23,13 @@ export type EffectKindLike = {
   defaultTimeMs?: number;
   defaultFeedback?: number;
   defaultMix?: number;
+  defaultCutoffHz?: number;
+  defaultQ?: number;
+  defaultAttackSec?: number;
+  defaultDecaySec?: number;
+  defaultSustain?: number;
+  defaultReleaseSec?: number;
+  defaultGate?: number;
 };
 
 export type EffectNodeDraft = {
@@ -36,6 +47,13 @@ export type EffectNodeDraft = {
     timeMs: number;
     feedback: number;
     mix: number;
+    cutoffHz: number;
+    q: number;
+    attackSec: number;
+    decaySec: number;
+    sustain: number;
+    releaseSec: number;
+    gate: number;
     status: string;
   };
 };
@@ -48,6 +66,12 @@ export function effectStatusLine(data: {
   drive: number;
   timeMs: number;
   feedback: number;
+  cutoffHz?: number;
+  q?: number;
+  attackSec?: number;
+  decaySec?: number;
+  sustain?: number;
+  gate?: number;
 }): string {
   if (!data.enabled) return 'bypassed';
   const kind = getEffectKind(data.kindKey);
@@ -58,6 +82,16 @@ export function effectStatusLine(data: {
     }
     if (data.kindKey === 'delay') {
       return `${roundTimeMs(data.timeMs)}ms fb ${roundFeedback(data.feedback)}`;
+    }
+    if (
+      data.kindKey === 'lowpass' ||
+      data.kindKey === 'highpass' ||
+      data.kindKey === 'bandpass'
+    ) {
+      return `${roundCutoffHz(data.cutoffHz ?? effectDefaults.cutoffHz)}Hz Q ${roundQ(data.q ?? effectDefaults.q)}`;
+    }
+    if (data.kindKey === 'adsr') {
+      return `A ${roundEnvelopeSec(data.attackSec ?? effectDefaults.attackSec)} D ${roundEnvelopeSec(data.decaySec ?? effectDefaults.decaySec)} G ${roundGate(data.gate ?? effectDefaults.gate)}`;
     }
   }
   const scale = scaleSnapScales.find((entry) => entry.key === data.scaleKey);
@@ -91,6 +125,29 @@ export function buildEffectNode<T extends EffectKindLike>(args: {
       ? kind.defaultFeedback
       : effectDefaults.feedback;
   const mix = typeof kind.defaultMix === 'number' ? kind.defaultMix : effectDefaults.mix;
+  const cutoffHz =
+    typeof kind.defaultCutoffHz === 'number'
+      ? kind.defaultCutoffHz
+      : effectDefaults.cutoffHz;
+  const q = typeof kind.defaultQ === 'number' ? kind.defaultQ : effectDefaults.q;
+  const attackSec =
+    typeof kind.defaultAttackSec === 'number'
+      ? kind.defaultAttackSec
+      : effectDefaults.attackSec;
+  const decaySec =
+    typeof kind.defaultDecaySec === 'number'
+      ? kind.defaultDecaySec
+      : effectDefaults.decaySec;
+  const sustain =
+    typeof kind.defaultSustain === 'number'
+      ? kind.defaultSustain
+      : effectDefaults.sustain;
+  const releaseSec =
+    typeof kind.defaultReleaseSec === 'number'
+      ? kind.defaultReleaseSec
+      : effectDefaults.releaseSec;
+  const gate =
+    typeof kind.defaultGate === 'number' ? kind.defaultGate : effectDefaults.gate;
   const label =
     args.existingEffectCount === 0
       ? kind.label
@@ -107,6 +164,13 @@ export function buildEffectNode<T extends EffectKindLike>(args: {
     timeMs,
     feedback,
     mix,
+    cutoffHz,
+    q,
+    attackSec,
+    decaySec,
+    sustain,
+    releaseSec,
+    gate,
     status: '',
   };
   data.status = effectStatusLine(data);

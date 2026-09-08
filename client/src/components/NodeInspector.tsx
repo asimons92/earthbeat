@@ -20,12 +20,14 @@ import {
   getConnectorKind,
   getEffectKind,
   modulatableChannelsForKind,
+  modulatableParamsForEffectKind,
   oscillatorDefaults,
   oscillatorModulatableParams,
   oscillatorWaveforms,
   scaleSnapScales,
   scaleSnapTonics,
   usgsConnector,
+  effectModulatableParams,
 } from '@/generated/catalog';
 import { audioFxIssueLabelsByNodeId } from '@/runtime/audioFxChain';
 import { channelFromSample, type ConnectorSample } from '@/runtime/channelFromSample';
@@ -36,24 +38,51 @@ import {
   normalizePlaybackSpeed,
 } from '@/runtime/playbackSpeed';
 import {
+  ATTACK_SEC_MAX,
+  ATTACK_SEC_MIN,
+  CUTOFF_HZ_MAX,
+  CUTOFF_HZ_MIN,
+  DECAY_SEC_MAX,
+  DECAY_SEC_MIN,
   DRIVE_MAX,
   DRIVE_MIN,
   FEEDBACK_MAX,
   FEEDBACK_MIN,
+  GATE_MAX,
+  GATE_MIN,
   MIX_MAX,
   MIX_MIN,
+  Q_MAX,
+  Q_MIN,
+  RELEASE_SEC_MAX,
+  RELEASE_SEC_MIN,
+  SUSTAIN_MAX,
+  SUSTAIN_MIN,
   TIME_MS_MAX,
   TIME_MS_MIN,
+  clampAttackSec,
+  clampCutoffHz,
+  clampDecaySec,
   clampDrive,
   clampFeedback,
+  clampGate,
   clampMix,
+  clampQ,
+  clampReleaseSec,
+  clampSustain,
   clampTimeMs,
+  roundCutoffHz,
   roundDrive,
+  roundEnvelopeSec,
   roundFeedback,
+  roundGate,
   roundMix,
+  roundQ,
+  roundSustain,
   roundTimeMs,
 } from '@/runtime/audioFxParams';
 import { toRuntimeEdges, toRuntimeNodes } from '@/runtime/runtimeNodes';
+import { isModTargetHandle } from '@/workspace/patchWireRules';
 
 const frequencyParam = oscillatorModulatableParams.find(
   (entry) => entry.key === 'frequencyHz',
@@ -73,7 +102,9 @@ function modulatorStatus(data: {
 
 function modulatorLabel(channelKey: string, targetParam: string) {
   const channel = usgsConnector.channels.find((entry) => entry.key === channelKey);
-  const param = oscillatorModulatableParams.find((entry) => entry.key === targetParam);
+  const param =
+    oscillatorModulatableParams.find((entry) => entry.key === targetParam) ??
+    effectModulatableParams.find((entry) => entry.key === targetParam);
   const left = channel?.label ?? channelKey;
   const right = param?.label ?? targetParam;
   return `${left} → ${right}`;
@@ -89,7 +120,9 @@ function walkDownstreamOscillator(
   while (true) {
     if (visited.has(cursor)) return null;
     visited.add(cursor);
-    const outbound = edges.find((edge) => edge.source === cursor);
+    const outbound = edges.find(
+      (edge) => edge.source === cursor && !isModTargetHandle(edge.targetHandle),
+    );
     if (!outbound) return null;
     const next = nodes.find((entry) => entry.id === outbound.target);
     if (!next) return null;
@@ -100,6 +133,20 @@ function walkDownstreamOscillator(
     }
     return null;
   }
+}
+
+function walkDownstreamEffectOnMod(
+  startId: string,
+  nodes: Node[],
+  edges: Edge[],
+): Node | null {
+  const outbound = edges.find(
+    (edge) => edge.source === startId && isModTargetHandle(edge.targetHandle),
+  );
+  if (!outbound) return null;
+  const next = nodes.find((entry) => entry.id === outbound.target);
+  if (!next || next.type !== 'effect') return null;
+  return next;
 }
 
 type NodeInspectorProps = {
@@ -164,6 +211,11 @@ export function NodeInspector({
     return walkDownstreamOscillator(selected.id, nodes, edges);
   }, [edges, nodes, selected]);
 
+  const downstreamEffect = useMemo(() => {
+    if (!selected || selected.type !== 'modulator') return null;
+    return walkDownstreamEffectOnMod(selected.id, nodes, edges);
+  }, [edges, nodes, selected]);
+
   const channelOptions = useMemo(() => {
     if (!upstreamConnector) return [];
     const kindKey = String(upstreamConnector.data.kindKey ?? '');
@@ -171,9 +223,12 @@ export function NodeInspector({
   }, [upstreamConnector]);
 
   const targetOptions = useMemo(() => {
+    if (downstreamEffect) {
+      return [...modulatableParamsForEffectKind(String(downstreamEffect.data.kindKey ?? ''))];
+    }
     if (!downstreamOscillator) return [];
     return [...oscillatorModulatableParams];
-  }, [downstreamOscillator]);
+  }, [downstreamEffect, downstreamOscillator]);
 
   if (!selected) {
     return (
@@ -475,12 +530,24 @@ export function NodeInspector({
       timeMs: number;
       feedback: number;
       mix: number;
+      cutoffHz: number;
+      q: number;
+      attackSec: number;
+      decaySec: number;
+      sustain: number;
+      releaseSec: number;
+      gate: number;
       status: string;
     };
     const kind = getEffectKind(data.kindKey);
     const isAudio = (kind?.transforms ?? []).some((entry) => entry === 'audio');
     const isDistortion = data.kindKey === 'distortion';
     const isDelay = data.kindKey === 'delay';
+    const isFilter =
+      data.kindKey === 'lowpass' ||
+      data.kindKey === 'highpass' ||
+      data.kindKey === 'bandpass';
+    const isAdsr = data.kindKey === 'adsr';
     const audioFxIssue = audioFxIssueLabels.get(selected.id);
 
     const patchEffect = (patch: Partial<typeof data>) => {
@@ -493,6 +560,12 @@ export function NodeInspector({
         drive: next.drive,
         timeMs: next.timeMs,
         feedback: next.feedback,
+        cutoffHz: next.cutoffHz,
+        q: next.q,
+        attackSec: next.attackSec,
+        decaySec: next.decaySec,
+        sustain: next.sustain,
+        gate: next.gate,
       });
       onChangeNodeData(selected.id, next);
     };
@@ -618,6 +691,103 @@ export function NodeInspector({
                 max={MIX_MAX}
                 decimals={2}
                 onChange={(mix) => patchEffect({ mix: roundMix(clampMix(mix)) })}
+              />
+            </div>
+          </>
+        ) : null}
+        {isFilter ? (
+          <>
+            <div className="inspector__field">
+              <Label htmlFor="effect-cutoff">Cutoff (Hz)</Label>
+              <Knob
+                id="effect-cutoff"
+                value={data.cutoffHz}
+                min={CUTOFF_HZ_MIN}
+                max={CUTOFF_HZ_MAX}
+                decimals={0}
+                onChange={(cutoffHz) =>
+                  patchEffect({ cutoffHz: roundCutoffHz(clampCutoffHz(cutoffHz)) })
+                }
+              />
+            </div>
+            <div className="inspector__field">
+              <Label htmlFor="effect-q">Q</Label>
+              <Knob
+                id="effect-q"
+                value={data.q}
+                min={Q_MIN}
+                max={Q_MAX}
+                decimals={3}
+                onChange={(q) => patchEffect({ q: roundQ(clampQ(q)) })}
+              />
+            </div>
+          </>
+        ) : null}
+        {isAdsr ? (
+          <>
+            <div className="inspector__field">
+              <Label htmlFor="effect-attack">Attack (s)</Label>
+              <Knob
+                id="effect-attack"
+                value={data.attackSec}
+                min={ATTACK_SEC_MIN}
+                max={ATTACK_SEC_MAX}
+                decimals={3}
+                onChange={(attackSec) =>
+                  patchEffect({ attackSec: roundEnvelopeSec(clampAttackSec(attackSec)) })
+                }
+              />
+            </div>
+            <div className="inspector__field">
+              <Label htmlFor="effect-decay">Decay (s)</Label>
+              <Knob
+                id="effect-decay"
+                value={data.decaySec}
+                min={DECAY_SEC_MIN}
+                max={DECAY_SEC_MAX}
+                decimals={3}
+                onChange={(decaySec) =>
+                  patchEffect({ decaySec: roundEnvelopeSec(clampDecaySec(decaySec)) })
+                }
+              />
+            </div>
+            <div className="inspector__field">
+              <Label htmlFor="effect-sustain">Sustain</Label>
+              <Knob
+                id="effect-sustain"
+                value={data.sustain}
+                min={SUSTAIN_MIN}
+                max={SUSTAIN_MAX}
+                decimals={2}
+                onChange={(sustain) =>
+                  patchEffect({ sustain: roundSustain(clampSustain(sustain)) })
+                }
+              />
+            </div>
+            <div className="inspector__field">
+              <Label htmlFor="effect-release">Release (s)</Label>
+              <Knob
+                id="effect-release"
+                value={data.releaseSec}
+                min={RELEASE_SEC_MIN}
+                max={RELEASE_SEC_MAX}
+                decimals={3}
+                onChange={(releaseSec) =>
+                  patchEffect({
+                    releaseSec: roundEnvelopeSec(clampReleaseSec(releaseSec)),
+                  })
+                }
+              />
+            </div>
+            <div className="inspector__field">
+              <Label htmlFor="effect-gate">Gate</Label>
+              <Knob
+                id="effect-gate"
+                value={data.gate}
+                min={GATE_MIN}
+                max={GATE_MAX}
+                decimals={2}
+                onChange={(gate) => patchEffect({ gate: roundGate(clampGate(gate)) })}
               />
             </div>
           </>

@@ -65,6 +65,13 @@ export type DomainEffect = {
   timeMs: number;
   feedback: number;
   mix: number;
+  cutoffHz: number;
+  q: number;
+  attackSec: number;
+  decaySec: number;
+  sustain: number;
+  releaseSec: number;
+  gate: number;
 };
 
 export type DomainWire = {
@@ -149,6 +156,13 @@ export function flowToDomainGraph(patchId: string, nodes: Node[], edges: Edge[])
         timeMs: typeof data.timeMs === 'number' ? data.timeMs : 250,
         feedback: typeof data.feedback === 'number' ? data.feedback : 0.35,
         mix: typeof data.mix === 'number' ? data.mix : 0.35,
+        cutoffHz: typeof data.cutoffHz === 'number' ? data.cutoffHz : 1000,
+        q: typeof data.q === 'number' ? data.q : 0.707,
+        attackSec: typeof data.attackSec === 'number' ? data.attackSec : 0.005,
+        decaySec: typeof data.decaySec === 'number' ? data.decaySec : 0.15,
+        sustain: typeof data.sustain === 'number' ? data.sustain : 0,
+        releaseSec: typeof data.releaseSec === 'number' ? data.releaseSec : 0.05,
+        gate: typeof data.gate === 'number' ? data.gate : 0,
       });
     }
   }
@@ -217,6 +231,13 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
       const timeMs = typeof row.timeMs === 'number' ? row.timeMs : 250;
       const feedback = typeof row.feedback === 'number' ? row.feedback : 0.35;
       const mix = typeof row.mix === 'number' ? row.mix : 0.35;
+      const cutoffHz = typeof row.cutoffHz === 'number' ? row.cutoffHz : 1000;
+      const q = typeof row.q === 'number' ? row.q : 0.707;
+      const attackSec = typeof row.attackSec === 'number' ? row.attackSec : 0.005;
+      const decaySec = typeof row.decaySec === 'number' ? row.decaySec : 0.15;
+      const sustain = typeof row.sustain === 'number' ? row.sustain : 0;
+      const releaseSec = typeof row.releaseSec === 'number' ? row.releaseSec : 0.05;
+      const gate = typeof row.gate === 'number' ? row.gate : 0;
       return {
         id: row.id,
         type: 'effect' as const,
@@ -232,6 +253,13 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
           timeMs,
           feedback,
           mix,
+          cutoffHz,
+          q,
+          attackSec,
+          decaySec,
+          sustain,
+          releaseSec,
+          gate,
           status: effectStatusLine({
             kindKey: row.kindKey,
             enabled: row.enabled,
@@ -240,6 +268,12 @@ export function domainGraphToFlow(graph: DomainGraph): { nodes: Node[]; edges: E
             drive,
             timeMs,
             feedback,
+            cutoffHz,
+            q,
+            attackSec,
+            decaySec,
+            sustain,
+            gate,
           }),
         },
       };

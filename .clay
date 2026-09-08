@@ -1,6 +1,4 @@
 {
-  "gitattributes": true,
-  "automerge": true,
   "models": [
     {
       "path": "clay/model.json",
@@ -27,8 +25,9 @@
           "date": "2026-09-28T13:16:21.793Z"
         }
       },
-      "last_generated": "2026-09-28T14:06:36.222Z",
-      "input_hash": "b27cbffb96a2a9900e9f11ee5f5042b1"
+      "last_generated": "2026-09-28T14:06:36.222Z"
     }
-  ]
+  ],
+  "gitattributes": true,
+  "automerge": true
 }

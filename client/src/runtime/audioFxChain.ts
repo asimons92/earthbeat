@@ -1,15 +1,30 @@
 /** Outbound Oscillator → audio Effect* chain for Elementary tone baking. */
 
 import { getEffectKind } from '@/generated/catalog';
+import { isModTargetHandle } from '@/workspace/patchWireRules';
 
 import {
+  ATTACK_SEC_DEFAULT,
+  clampAttackSec,
+  clampCutoffHz,
+  clampDecaySec,
   clampDrive,
   clampFeedback,
+  clampGate,
   clampMix,
+  clampQ,
+  clampReleaseSec,
+  clampSustain,
   clampTimeMs,
+  CUTOFF_HZ_DEFAULT,
+  DECAY_SEC_DEFAULT,
   DRIVE_DEFAULT,
   FEEDBACK_DEFAULT,
+  GATE_DEFAULT,
   MIX_DEFAULT,
+  Q_DEFAULT,
+  RELEASE_SEC_DEFAULT,
+  SUSTAIN_DEFAULT,
   TIME_MS_DEFAULT,
 } from './audioFxParams';
 import type { RuntimeEdge, RuntimeNode } from './modulationChain';
@@ -30,7 +45,30 @@ export type DelayFxStep = {
   mix: number;
 };
 
-export type AudioFxStep = DistortionFxStep | DelayFxStep;
+export type FilterFxStep = {
+  id: string;
+  kind: 'lowpass' | 'highpass' | 'bandpass';
+  enabled: boolean;
+  cutoffHz: number;
+  q: number;
+};
+
+export type AdsrFxStep = {
+  id: string;
+  kind: 'adsr';
+  enabled: boolean;
+  attackSec: number;
+  decaySec: number;
+  sustain: number;
+  releaseSec: number;
+  gate: number;
+};
+
+export type AudioFxStep =
+  | DistortionFxStep
+  | DelayFxStep
+  | FilterFxStep
+  | AdsrFxStep;
 
 export type AudioFxChainOk = {
   ok: true;
@@ -46,9 +84,6 @@ export type AudioFxChainResult = AudioFxChainOk | AudioFxChainFail;
 
 export type AudioFxIssueReason = Exclude<AudioFxChainFail['reason'], 'missing_oscillator'>;
 
-const AUDIO_KIND_DISTORTION = 'distortion';
-const AUDIO_KIND_DELAY = 'delay';
-
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
@@ -59,6 +94,10 @@ function asBoolean(value: unknown, fallback: boolean): boolean {
 
 function asString(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+function isSignalEdge(edge: RuntimeEdge): boolean {
+  return !isModTargetHandle(edge.targetHandle);
 }
 
 /** True when the EffectKind catalog entry transforms audio (not control Hertz). */
@@ -76,7 +115,7 @@ function toAudioFxStep(node: RuntimeNode): AudioFxStep | null {
   if (!isAudioEffectNode(node)) return null;
   const kindKey = asString(node.data.kindKey, '');
   const enabled = asBoolean(node.data.enabled, true);
-  if (kindKey === AUDIO_KIND_DISTORTION) {
+  if (kindKey === 'distortion') {
     return {
       id: node.id,
       kind: 'distortion',
@@ -84,7 +123,7 @@ function toAudioFxStep(node: RuntimeNode): AudioFxStep | null {
       drive: clampDrive(asNumber(node.data.drive, DRIVE_DEFAULT)),
     };
   }
-  if (kindKey === AUDIO_KIND_DELAY) {
+  if (kindKey === 'delay') {
     return {
       id: node.id,
       kind: 'delay',
@@ -94,13 +133,33 @@ function toAudioFxStep(node: RuntimeNode): AudioFxStep | null {
       mix: clampMix(asNumber(node.data.mix, MIX_DEFAULT)),
     };
   }
+  if (kindKey === 'lowpass' || kindKey === 'highpass' || kindKey === 'bandpass') {
+    return {
+      id: node.id,
+      kind: kindKey,
+      enabled,
+      cutoffHz: clampCutoffHz(asNumber(node.data.cutoffHz, CUTOFF_HZ_DEFAULT)),
+      q: clampQ(asNumber(node.data.q, Q_DEFAULT)),
+    };
+  }
+  if (kindKey === 'adsr') {
+    return {
+      id: node.id,
+      kind: 'adsr',
+      enabled,
+      attackSec: clampAttackSec(asNumber(node.data.attackSec, ATTACK_SEC_DEFAULT)),
+      decaySec: clampDecaySec(asNumber(node.data.decaySec, DECAY_SEC_DEFAULT)),
+      sustain: clampSustain(asNumber(node.data.sustain, SUSTAIN_DEFAULT)),
+      releaseSec: clampReleaseSec(asNumber(node.data.releaseSec, RELEASE_SEC_DEFAULT)),
+      gate: clampGate(asNumber(node.data.gate, GATE_DEFAULT)),
+    };
+  }
   return null;
 }
 
 /**
  * Walk Oscillator → audio Effect* in source-to-sink order.
- * Rejects fan-in (target with more than one inbound) and fan-out (more than one outbound audio edge).
- * Control Effects on the outbound path are skipped (not followed).
+ * Ignores mod-handle edges. Rejects signal fan-in and fan-out.
  */
 export function resolveOutboundAudioFxChain(
   nodes: RuntimeNode[],
@@ -113,9 +172,10 @@ export function resolveOutboundAudioFxChain(
     return { ok: false, reason: 'missing_oscillator' };
   }
 
-  const inboundCount = new Map<string, number>();
+  const signalInboundCount = new Map<string, number>();
   for (const edge of edges) {
-    inboundCount.set(edge.target, (inboundCount.get(edge.target) ?? 0) + 1);
+    if (!isSignalEdge(edge)) continue;
+    signalInboundCount.set(edge.target, (signalInboundCount.get(edge.target) ?? 0) + 1);
   }
 
   const steps: AudioFxStep[] = [];
@@ -125,6 +185,7 @@ export function resolveOutboundAudioFxChain(
   while (true) {
     const outbound = edges.filter((edge) => {
       if (edge.source !== cursor) return false;
+      if (!isSignalEdge(edge)) return false;
       const target = byId.get(edge.target);
       return target ? isAudioEffectNode(target) : false;
     });
@@ -142,7 +203,7 @@ export function resolveOutboundAudioFxChain(
       return { ok: true, steps };
     }
 
-    if ((inboundCount.get(next.id) ?? 0) > 1) {
+    if ((signalInboundCount.get(next.id) ?? 0) > 1) {
       return { ok: false, reason: 'fan_in' };
     }
     if (visited.has(next.id)) {
@@ -167,7 +228,7 @@ export function audioFxFailureLabel(reason: AudioFxIssueReason): string {
   return 'unknown audio FX — dry';
 }
 
-/** Audio Effect ids reachable outbound from start along audio wires (ignores fan rules). */
+/** Audio Effect ids reachable outbound from start along audio signal wires. */
 function outboundAudioEffectIds(
   nodes: RuntimeNode[],
   edges: RuntimeEdge[],
@@ -181,6 +242,7 @@ function outboundAudioEffectIds(
     const cursor = queue.shift()!;
     for (const edge of edges) {
       if (edge.source !== cursor) continue;
+      if (!isSignalEdge(edge)) continue;
       const target = byId.get(edge.target);
       if (!target || !isAudioEffectNode(target)) continue;
       if (visited.has(target.id)) continue;
@@ -214,15 +276,11 @@ export function audioFxIssueLabelsByNodeId(
   return labels;
 }
 
-/** Stable identity for voice rebuild when FX topology or params change. */
+/**
+ * Stable identity for voice rebuild when FX topology or enabled flags change.
+ * Live param values are updated via refs and are not part of the fingerprint.
+ */
 export function audioFxFingerprint(steps: AudioFxStep[]): string {
   if (steps.length === 0) return '';
-  return steps
-    .map((step) => {
-      if (step.kind === 'distortion') {
-        return `${step.id}:distortion:${step.enabled ? 1 : 0}:${step.drive}`;
-      }
-      return `${step.id}:delay:${step.enabled ? 1 : 0}:${step.timeMs}:${step.feedback}:${step.mix}`;
-    })
-    .join('|');
+  return steps.map((step) => `${step.id}:${step.kind}:${step.enabled ? 1 : 0}`).join('|');
 }

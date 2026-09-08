@@ -262,6 +262,7 @@ export const effectKinds = [
     "transforms": [
       "frequencyHz"
     ],
+    "modulatableParamKeys": [],
     "defaultTonic": "C",
     "defaultScaleKey": "major",
     "defaultEnabled": true,
@@ -274,6 +275,9 @@ export const effectKinds = [
     "transforms": [
       "audio"
     ],
+    "modulatableParamKeys": [
+      "drive"
+    ],
     "defaultEnabled": true,
     "defaultDrive": 2
   },
@@ -284,10 +288,81 @@ export const effectKinds = [
     "transforms": [
       "audio"
     ],
+    "modulatableParamKeys": [
+      "timeMs",
+      "feedback",
+      "mix"
+    ],
     "defaultEnabled": true,
     "defaultTimeMs": 250,
     "defaultFeedback": 0.35,
     "defaultMix": 0.35
+  },
+  {
+    "key": "lowpass",
+    "label": "Lowpass",
+    "description": "Low-pass state-variable filter on the Oscillator audio path.",
+    "transforms": [
+      "audio"
+    ],
+    "modulatableParamKeys": [
+      "cutoffHz",
+      "q"
+    ],
+    "defaultEnabled": true,
+    "defaultCutoffHz": 1000,
+    "defaultQ": 0.707
+  },
+  {
+    "key": "highpass",
+    "label": "Highpass",
+    "description": "High-pass state-variable filter on the Oscillator audio path.",
+    "transforms": [
+      "audio"
+    ],
+    "modulatableParamKeys": [
+      "cutoffHz",
+      "q"
+    ],
+    "defaultEnabled": true,
+    "defaultCutoffHz": 1000,
+    "defaultQ": 0.707
+  },
+  {
+    "key": "bandpass",
+    "label": "Bandpass",
+    "description": "Band-pass state-variable filter on the Oscillator audio path.",
+    "transforms": [
+      "audio"
+    ],
+    "modulatableParamKeys": [
+      "cutoffHz",
+      "q"
+    ],
+    "defaultEnabled": true,
+    "defaultCutoffHz": 1000,
+    "defaultQ": 0.707
+  },
+  {
+    "key": "adsr",
+    "label": "ADSR",
+    "description": "Amplitude envelope on the Oscillator audio path, triggered by a gate.",
+    "transforms": [
+      "audio"
+    ],
+    "modulatableParamKeys": [
+      "attackSec",
+      "decaySec",
+      "sustain",
+      "releaseSec",
+      "gate"
+    ],
+    "defaultEnabled": true,
+    "defaultAttackSec": 0.005,
+    "defaultDecaySec": 0.15,
+    "defaultSustain": 0,
+    "defaultReleaseSec": 0.05,
+    "defaultGate": 0
   }
 ] as const;
 
@@ -298,6 +373,14 @@ export const effectKindsByKey = {
   'distortion': effectKinds[1],
 
   'delay': effectKinds[2],
+
+  'lowpass': effectKinds[3],
+
+  'highpass': effectKinds[4],
+
+  'bandpass': effectKinds[5],
+
+  'adsr': effectKinds[6],
 
 } as const;
 
@@ -414,7 +497,14 @@ export const effectDefaults = {
   "drive": 2,
   "timeMs": 250,
   "feedback": 0.35,
-  "mix": 0.35
+  "mix": 0.35,
+  "cutoffHz": 1000,
+  "q": 0.707,
+  "attackSec": 0.005,
+  "decaySec": 0.15,
+  "sustain": 0,
+  "releaseSec": 0.05,
+  "gate": 0
 } as const;
 
 export const oscillatorDefaults = {
@@ -466,6 +556,108 @@ export const oscillatorModulatableParams = [
   {
     "key": "gain",
     "label": "Gain",
+    "min": 0,
+    "max": 1,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0,
+    "modulationOutMax": 1
+  }
+] as const;
+
+export const effectModulatableParams = [
+  {
+    "key": "drive",
+    "label": "Drive",
+    "min": 1,
+    "max": 20,
+    "modulationKind": "absolute",
+    "modulationOutMin": 1,
+    "modulationOutMax": 20
+  },
+  {
+    "key": "timeMs",
+    "label": "Time (ms)",
+    "min": 20,
+    "max": 1000,
+    "modulationKind": "absolute",
+    "modulationOutMin": 20,
+    "modulationOutMax": 1000
+  },
+  {
+    "key": "feedback",
+    "label": "Feedback",
+    "min": 0,
+    "max": 0.95,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0,
+    "modulationOutMax": 0.95
+  },
+  {
+    "key": "mix",
+    "label": "Mix",
+    "min": 0,
+    "max": 1,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0,
+    "modulationOutMax": 1
+  },
+  {
+    "key": "cutoffHz",
+    "label": "Cutoff (Hz)",
+    "min": 20,
+    "max": 20000,
+    "modulationKind": "absolute",
+    "modulationOutMin": 20,
+    "modulationOutMax": 8000
+  },
+  {
+    "key": "q",
+    "label": "Q",
+    "min": 0.1,
+    "max": 20,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0.1,
+    "modulationOutMax": 8
+  },
+  {
+    "key": "attackSec",
+    "label": "Attack (s)",
+    "min": 0.001,
+    "max": 2,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0.001,
+    "modulationOutMax": 0.5
+  },
+  {
+    "key": "decaySec",
+    "label": "Decay (s)",
+    "min": 0.001,
+    "max": 2,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0.01,
+    "modulationOutMax": 1
+  },
+  {
+    "key": "sustain",
+    "label": "Sustain",
+    "min": 0,
+    "max": 1,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0,
+    "modulationOutMax": 1
+  },
+  {
+    "key": "releaseSec",
+    "label": "Release (s)",
+    "min": 0.001,
+    "max": 2,
+    "modulationKind": "absolute",
+    "modulationOutMin": 0.01,
+    "modulationOutMax": 1
+  },
+  {
+    "key": "gate",
+    "label": "Gate",
     "min": 0,
     "max": 1,
     "modulationKind": "absolute",
@@ -620,4 +812,14 @@ export function modulatableChannelsForKind(kindKey: string) {
   const kind = getConnectorKind(kindKey);
   if (!kind) return [];
   return kind.channels.filter((channel) => channel.modulatable);
+}
+
+/** Modulatable Effect params for one EffectKind (empty for Scale Snap). */
+export function modulatableParamsForEffectKind(kindKey: string) {
+  const kind = getEffectKind(kindKey);
+  if (!kind) return [];
+  const keys = new Set(
+    ('modulatableParamKeys' in kind ? kind.modulatableParamKeys : []) as readonly string[],
+  );
+  return effectModulatableParams.filter((param) => keys.has(param.key));
 }

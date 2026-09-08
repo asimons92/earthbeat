@@ -24,5 +24,7 @@ export function toRuntimeEdges(edges: Edge[]): RuntimeEdge[] {
     id: edge.id,
     source: edge.source,
     target: edge.target,
+    sourceHandle: edge.sourceHandle,
+    targetHandle: edge.targetHandle,
   }));
 }

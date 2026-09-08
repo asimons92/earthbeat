@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import {
   canConnectPatchNodes,
   effectRoleFromTransforms,
+  isModTargetHandle,
+  resolvePatchWireHandle,
   type PatchWireRole,
 } from './patchWireRules';
 
@@ -19,6 +21,12 @@ const roleArb = fc.constantFrom(...roles);
 const allowed = true;
 const denied = false;
 
+const emptySignal = {
+  targetSignalInboundCount: 0,
+  targetModInboundCount: 0,
+  sourceAudioOutboundCount: 0,
+} as const;
+
 describe('effectRoleFromTransforms', () => {
   it('maps audio transform to audio_effect and anything else to control_effect', () => {
     fc.assert(
@@ -31,50 +39,72 @@ describe('effectRoleFromTransforms', () => {
   });
 });
 
-describe('canConnectPatchNodes', () => {
-  it('allows Oscillator to audio Effect when the target has no inbound and source has no audio outbound', () => {
+describe('resolvePatchWireHandle / isModTargetHandle', () => {
+  it('treats only the literal mod handle as modulation', () => {
     fc.assert(
-      fc.property(fc.constant(0), fc.constant(0), (inbound, outbound) => {
+      fc.property(
+        fc.constantFrom(null, undefined, 'in', 'out', 'mod', 'MOD', '') as fc.Arbitrary<
+          string | null | undefined
+        >,
+        (handle) => {
+          const resolved = resolvePatchWireHandle(handle);
+          expect(resolved === 'mod').toBe(handle === 'mod');
+          expect(isModTargetHandle(handle)).toBe(handle === 'mod');
+        },
+      ),
+    );
+  });
+});
+
+describe('canConnectPatchNodes', () => {
+  it('allows Oscillator to audio Effect when the signal target is free and source has no audio outbound', () => {
+    fc.assert(
+      fc.property(fc.nat({ max: 8 }), (modInbound) => {
         expect(
           canConnectPatchNodes({
             sourceRole: 'oscillator',
             targetRole: 'audio_effect',
-            targetInboundCount: inbound,
-            sourceAudioOutboundCount: outbound,
+            targetSignalInboundCount: 0,
+            targetModInboundCount: modInbound,
+            sourceAudioOutboundCount: 0,
+            targetHandle: 'in',
           }),
         ).toBe(allowed);
       }),
     );
   });
 
-  it('allows audio Effect to audio Effect on a free target with no prior audio outbound', () => {
+  it('allows audio Effect to audio Effect on a free signal target with no prior audio outbound', () => {
     const fromAudio = canConnectPatchNodes({
       sourceRole: 'audio_effect',
       targetRole: 'audio_effect',
-      targetInboundCount: 0,
-      sourceAudioOutboundCount: 0,
+      ...emptySignal,
+      targetHandle: 'in',
     });
     const fromOsc = canConnectPatchNodes({
       sourceRole: 'oscillator',
       targetRole: 'audio_effect',
-      targetInboundCount: 0,
-      sourceAudioOutboundCount: 0,
+      ...emptySignal,
+      targetHandle: 'in',
     });
     expect(fromAudio).toBe(fromOsc);
   });
 
-  it('rejects a second inbound into an audio Effect', () => {
+  it('rejects a second signal inbound into an audio Effect', () => {
     fc.assert(
       fc.property(
         fc.constantFrom('oscillator', 'audio_effect') as fc.Arbitrary<PatchWireRole>,
         fc.integer({ min: 1, max: 8 }),
-        (sourceRole, inbound) => {
+        fc.nat({ max: 4 }),
+        (sourceRole, signalInbound, modInbound) => {
           expect(
             canConnectPatchNodes({
               sourceRole,
               targetRole: 'audio_effect',
-              targetInboundCount: inbound,
+              targetSignalInboundCount: signalInbound,
+              targetModInboundCount: modInbound,
               sourceAudioOutboundCount: 0,
+              targetHandle: 'in',
             }),
           ).toBe(denied);
         },
@@ -86,30 +116,77 @@ describe('canConnectPatchNodes', () => {
     const audioIntoOsc = canConnectPatchNodes({
       sourceRole: 'audio_effect',
       targetRole: 'oscillator',
-      targetInboundCount: 0,
-      sourceAudioOutboundCount: 0,
+      ...emptySignal,
     });
     const oscIntoControl = canConnectPatchNodes({
       sourceRole: 'oscillator',
       targetRole: 'control_effect',
-      targetInboundCount: 0,
-      sourceAudioOutboundCount: 0,
+      ...emptySignal,
     });
     expect(audioIntoOsc).toBe(denied);
     expect(oscIntoControl).toBe(denied);
   });
 
-  it('rejects Connector or Modulator into an audio Effect', () => {
+  it('rejects Connector into an audio Effect on either handle', () => {
+    fc.assert(
+      fc.property(fc.constantFrom('in', 'mod', null) as fc.Arbitrary<string | null>, (handle) => {
+        expect(
+          canConnectPatchNodes({
+            sourceRole: 'connector',
+            targetRole: 'audio_effect',
+            ...emptySignal,
+            targetHandle: handle,
+          }),
+        ).toBe(denied);
+      }),
+    );
+  });
+
+  it('rejects Modulator into an audio Effect on the signal handle', () => {
+    expect(
+      canConnectPatchNodes({
+        sourceRole: 'modulator',
+        targetRole: 'audio_effect',
+        ...emptySignal,
+        targetHandle: 'in',
+      }),
+    ).toBe(denied);
+  });
+
+  it('allows Modulator into audio or control Effect on the mod handle even when signal inbound is taken', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom('connector', 'modulator') as fc.Arbitrary<PatchWireRole>,
-        (sourceRole) => {
+        fc.constantFrom('audio_effect', 'control_effect') as fc.Arbitrary<PatchWireRole>,
+        fc.nat({ max: 3 }),
+        fc.nat({ max: 3 }),
+        (targetRole, signalInbound, modInbound) => {
+          expect(
+            canConnectPatchNodes({
+              sourceRole: 'modulator',
+              targetRole,
+              targetSignalInboundCount: signalInbound,
+              targetModInboundCount: modInbound,
+              sourceAudioOutboundCount: 0,
+              targetHandle: 'mod',
+            }),
+          ).toBe(allowed);
+        },
+      ),
+    );
+  });
+
+  it('rejects non-Modulator sources on the mod handle', () => {
+    fc.assert(
+      fc.property(
+        roleArb.filter((role) => role !== 'modulator'),
+        fc.constantFrom('audio_effect', 'control_effect') as fc.Arbitrary<PatchWireRole>,
+        (sourceRole, targetRole) => {
           expect(
             canConnectPatchNodes({
               sourceRole,
-              targetRole: 'audio_effect',
-              targetInboundCount: 0,
-              sourceAudioOutboundCount: 0,
+              targetRole,
+              ...emptySignal,
+              targetHandle: 'mod',
             }),
           ).toBe(denied);
         },
@@ -126,8 +203,8 @@ describe('canConnectPatchNodes', () => {
             canConnectPatchNodes({
               sourceRole,
               targetRole: 'oscillator',
-              targetInboundCount: 0,
-              sourceAudioOutboundCount: 0,
+              ...emptySignal,
+              targetHandle: 'in',
             }),
           ).toBe(allowed);
         },
@@ -144,12 +221,37 @@ describe('canConnectPatchNodes', () => {
             canConnectPatchNodes({
               sourceRole: 'audio_effect',
               targetRole,
-              targetInboundCount: 0,
-              sourceAudioOutboundCount: 0,
+              ...emptySignal,
+              targetHandle: 'in',
             }),
           ).toBe(denied);
         },
       ),
+    );
+  });
+
+  it('signal inbound occupancy is independent of mod inbound occupancy', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 6 }), (modInbound) => {
+        const signalFree = canConnectPatchNodes({
+          sourceRole: 'oscillator',
+          targetRole: 'audio_effect',
+          targetSignalInboundCount: 0,
+          targetModInboundCount: modInbound,
+          sourceAudioOutboundCount: 0,
+          targetHandle: 'in',
+        });
+        const signalTaken = canConnectPatchNodes({
+          sourceRole: 'oscillator',
+          targetRole: 'audio_effect',
+          targetSignalInboundCount: 1,
+          targetModInboundCount: modInbound,
+          sourceAudioOutboundCount: 0,
+          targetHandle: 'in',
+        });
+        expect(signalFree).toBe(allowed);
+        expect(signalTaken).toBe(denied);
+      }),
     );
   });
 });

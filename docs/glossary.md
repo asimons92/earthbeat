@@ -20,11 +20,11 @@ Effect Library is the route that lists every EffectKind in the Clay catalog. Pat
 
 Patch Library is the route that lists Patches owned by the signed-in User. Path: `/patches`. A row opens that Patch on the canvas.
 
-Modulator is a canvas node that maps a Channel onto an Oscillator parameter. Example: `mag` to frequency with ratios of the Oscillator base. React Flow edges between nodes are plain Wires. They do not store mapping data.
+Modulator is a canvas node that maps a Channel onto an Oscillator parameter or an Effect parameter. Example: `mag` to frequency with ratios of the Oscillator base, or `mag` to ADSR gate. React Flow edges between nodes are plain Wires. They do not store mapping data.
 
 Oscillator is a canvas node that makes sound. Legal waveforms are sine, square, saw, and noise. The catalog default waveform is sine.
 
-Effect is a canvas node that transforms a signal around an Oscillator. Control EffectKinds (Scale Snap) transform Hertz on the path into an Oscillator. Audio EffectKinds (Distortion, Delay) transform the Oscillator audio before the mix. When Enable is off, the Effect passes the signal through unchanged.
+Effect is a canvas node that transforms a signal around an Oscillator. Control EffectKinds (Scale Snap) transform Hertz on the path into an Oscillator. Audio EffectKinds (Distortion, Delay, Lowpass, Highpass, Bandpass, ADSR) transform the Oscillator audio before the mix. When Enable is off, the Effect passes the signal through unchanged. A Modulator can wire into an Effect mod handle to map a Channel onto a continuous Effect param such as ADSR gate or filter cutoff.
 
 Wire is a plain edge between two canvas nodes in a Patch. It stores source and target node ids and optional handles. It does not store mapping data.
 
@@ -66,4 +66,8 @@ Distortion Effect defaults are enabled on and Drive `2` (soft tanh clip on the a
 
 Delay Effect defaults are enabled on, Time `250` ms, Feedback `0.35`, and Mix `0.35` (internal dry/wet on the audio path).
 
-A new Modulator starts with empty channel and target keys. Wiring a Connector fills the first modulatable Channel and its in-range hints when the current Channel is empty or missing on that kind. Wiring through to an Oscillator (Effects allowed in between) fills the first modulatable target param and its out-range the same way. Catalog `modulatorDefaults` still describe the USGS magnitude-to-frequency example ranges.
+Lowpass, Highpass, and Bandpass Effect defaults are enabled on, Cutoff `1000` Hz, and Q `0.707`.
+
+ADSR Effect defaults are enabled on, Attack `0.005` s, Decay `0.15` s, Sustain `0`, Release `0.05` s, and Gate `0`. Gate is a 0 to 1 control that opens the envelope. It is not triggered by audio loudness.
+
+A new Modulator starts with empty channel and target keys. Wiring a Connector fills the first modulatable Channel and its in-range hints when the current Channel is empty or missing on that kind. Wiring through to an Oscillator (control Effects allowed in between) fills the first modulatable Oscillator target param and its out-range the same way. Wiring a Modulator to an Effect mod handle fills the first modulatable param for that Effect kind. Catalog `modulatorDefaults` still describe the USGS magnitude-to-frequency example ranges.

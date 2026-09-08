@@ -139,6 +139,20 @@ export const effects = pgTable('effects', {
 
   mix: doublePrecision('mix').notNull(),
 
+  cutoffHz: doublePrecision('cutoff_hz').notNull(),
+
+  q: doublePrecision('q').notNull(),
+
+  attackSec: doublePrecision('attack_sec').notNull(),
+
+  decaySec: doublePrecision('decay_sec').notNull(),
+
+  sustain: doublePrecision('sustain').notNull(),
+
+  releaseSec: doublePrecision('release_sec').notNull(),
+
+  gate: doublePrecision('gate').notNull(),
+
 });
 
 
