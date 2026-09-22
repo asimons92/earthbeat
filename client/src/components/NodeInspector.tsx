@@ -389,8 +389,13 @@ export function NodeInspector({
       interpolate?: boolean;
     };
     const kind = getConnectorKind(data.kindKey) ?? usgsConnector;
+    const defaultConfig =
+      'defaultConfig' in kind ? kind.defaultConfig : undefined;
     const supportsInterpolate =
-      data.kindKey === 'noaa_coops_tides' || data.kindKey === 'ndbc_buoy_waves';
+      typeof defaultConfig === 'object' &&
+      defaultConfig !== null &&
+      'interpolate' in defaultConfig &&
+      typeof defaultConfig.interpolate === 'boolean';
     const interpolate = data.interpolate !== false;
     const playbackSpeed = normalizePlaybackSpeed(
       data.playbackSpeed ?? PLAYBACK_SPEED_DEFAULT,

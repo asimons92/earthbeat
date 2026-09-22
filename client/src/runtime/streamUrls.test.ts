@@ -11,12 +11,14 @@ const knownKindArb = fc.constantFrom(
   'usgs_earthquakes',
   'noaa_coops_tides',
   'ndbc_buoy_waves',
+  'swpc_solar_wind',
 );
 
 const pathByKind: Record<string, string> = {
   usgs_earthquakes: '/api/earthquakes/stream',
   noaa_coops_tides: '/api/tides/stream',
   ndbc_buoy_waves: '/api/waves/stream',
+  swpc_solar_wind: '/api/solar-wind/stream',
 };
 
 describe('streamUrls', () => {
@@ -36,7 +38,8 @@ describe('streamUrls', () => {
           (key) =>
             key !== 'usgs_earthquakes' &&
             key !== 'noaa_coops_tides' &&
-            key !== 'ndbc_buoy_waves',
+            key !== 'ndbc_buoy_waves' &&
+            key !== 'swpc_solar_wind',
         ),
         (key) => {
           const absent = undefined;
@@ -51,7 +54,7 @@ describe('streamUrls', () => {
       fc.property(
         fc.uniqueArray(knownKindArb, {
           minLength: 0,
-          maxLength: 3,
+          maxLength: 4,
         }),
         (keys) => {
           const nodes: Array<{

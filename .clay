@@ -7,8 +7,8 @@
       "output": ".",
       "generated_files": {
         "client/src/generated/catalog.ts": {
-          "md5": "a7dbdf45637eec3a601bacf1dfd66ced",
-          "date": "2026-09-07T02:40:27.355Z"
+          "md5": "c1fdead9af3e466764e8b1e43f5949a5",
+          "date": "2026-09-22T20:18:29.089Z"
         },
         "server/src/generated/types.ts": {
           "md5": "bb544dfdce407aa0522e6b9728ad8581",
@@ -27,8 +27,8 @@
           "date": "2026-09-07T02:40:48.844Z"
         }
       },
-      "last_generated": "2026-09-07T02:40:48.844Z",
-      "input_hash": "0ce740923ecaae1e4b926981fe010be1"
+      "last_generated": "2026-09-22T20:18:29.089Z",
+      "input_hash": "aec27a8d51cb3a85592a354e4620e5e1"
     }
   ]
 }

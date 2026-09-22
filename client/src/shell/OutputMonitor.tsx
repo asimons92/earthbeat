@@ -49,6 +49,10 @@ function readoutSecondary(
       const period =
         sample.wavePeriod != null ? ` · ${sample.wavePeriod.toFixed(1)} s` : '';
       parts.push(`${label} ${sample.waveHeight.toFixed(2)} m${period}`);
+    } else if (sample.kindKey === 'swpc_solar_wind' && sample.speed != null) {
+      const density = sample.density != null ? ` · ${sample.density.toFixed(2)} /cm3` : '';
+      const bz = sample.bz != null ? ` · Bz ${sample.bz.toFixed(2)} nT` : '';
+      parts.push(`${label} ${sample.speed.toFixed(0)} km/s${density}${bz}`);
     } else {
       parts.push(label);
     }

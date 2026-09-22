@@ -197,6 +197,7 @@ MVP is successful when:
 4. **Resolved for M3:** patches are **private-only** (owned by `userId`). Share-by-link is out of scope.
 5. **Resolved for M2:** live USGS data is **server-mediated** (Express poll + SSE). Client pulls samples over EventSource and runs Elementary audio. Revisit for multi-Connector or Patch-clock designs.
 6. **Deferred:** Patch tempo toggle and quantizing Connectors to a Patch clock (likely a Patch transport state machine). See `docs/feature/runtime/2026-09-04-m2-usgs-elementary.md`.
+7. **Resolved:** the fourth ConnectorKind is `swpc_solar_wind` (NOAA SWPC RTSW wind and magnetometer, one minute). Catalog, library UI, live poll, and slow-scrub SSE at `/api/solar-wind/stream` are in place.
 
 ## 13. References
 

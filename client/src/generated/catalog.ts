@@ -168,6 +168,73 @@ export const connectorKinds = [
         "modulatable": false
       }
     ]
+  },
+  {
+    "key": "swpc_solar_wind",
+    "label": "Solar Wind",
+    "description": "NOAA SWPC real-time solar wind. One-minute RTSW wind and magnetometer files for the active spacecraft. Server polls about every minute and scrubs about 24h into a 120s loop.",
+    "feedUrl": "https://services.swpc.noaa.gov/json/rtsw/",
+    "defaultPollIntervalMs": 60000,
+    "defaultPlaybackHz": 1,
+    "defaultLoopSeconds": 120,
+    "defaultConfig": {
+      "windFile": "rtsw_wind_1m.json",
+      "magFile": "rtsw_mag_1m.json",
+      "interpolate": true
+    },
+    "channels": [
+      {
+        "key": "speed",
+        "label": "Speed",
+        "unit": "km/s",
+        "valueType": "number",
+        "source": "proton_speed",
+        "modulatable": true,
+        "min": 200,
+        "max": 1200,
+        "mapHintMin": 300,
+        "mapHintMax": 800
+      },
+      {
+        "key": "density",
+        "label": "Density",
+        "unit": "1/cm3",
+        "valueType": "number",
+        "source": "proton_density",
+        "modulatable": true,
+        "min": 0,
+        "max": 40,
+        "mapHintMin": 0.5,
+        "mapHintMax": 15
+      },
+      {
+        "key": "bz",
+        "label": "Bz",
+        "unit": "nT",
+        "valueType": "number",
+        "source": "bz_gsm",
+        "modulatable": true,
+        "min": -50,
+        "max": 50,
+        "mapHintMin": -15,
+        "mapHintMax": 15
+      },
+      {
+        "key": "time",
+        "label": "Observation time",
+        "valueType": "timestamp",
+        "source": "time_tag",
+        "modulatable": false,
+        "description": "RTSW observation timestamp (UTC)"
+      },
+      {
+        "key": "source",
+        "label": "Spacecraft",
+        "valueType": "string",
+        "source": "source",
+        "modulatable": false
+      }
+    ]
   }
 ] as const;
 
@@ -178,6 +245,8 @@ export const connectorKindsByKey = {
   'noaa_coops_tides': connectorKinds[1],
 
   'ndbc_buoy_waves': connectorKinds[2],
+
+  'swpc_solar_wind': connectorKinds[3],
 
 } as const;
 

@@ -22,8 +22,10 @@ import {
 import { classifyRequestPath, resolveClientDistDir } from './staticSite.js';
 import { TideStream, type TideSeriesSnapshot } from './tideStream.js';
 import { WaveStream, type WaveSeriesSnapshot } from './waveStream.js';
+import { SolarWindStream, type SolarWindSeriesSnapshot } from './solarWindStream.js';
 import { DEFAULT_POLL_INTERVAL_MS as TIDE_POLL_INTERVAL_MS } from './noaaCoops.js';
 import { DEFAULT_POLL_INTERVAL_MS as WAVE_POLL_INTERVAL_MS } from './ndbcBuoy.js';
+import { DEFAULT_POLL_INTERVAL_MS as SOLAR_WIND_POLL_INTERVAL_MS } from './swpcSolarWind.js';
 import { DEFAULT_POLL_INTERVAL_MS } from './usgs.js';
 
 const app = express();
@@ -86,6 +88,10 @@ const waveStream = new WaveStream({
   pollIntervalMs: WAVE_POLL_INTERVAL_MS,
 });
 
+const solarWindStream = new SolarWindStream({
+  pollIntervalMs: SOLAR_WIND_POLL_INTERVAL_MS,
+});
+
 earthquakeStream.on('error', (error) => {
   console.error('Earthquake stream error:', error);
 });
@@ -96,6 +102,10 @@ tideStream.on('error', (error) => {
 
 waveStream.on('error', (error) => {
   console.error('Wave stream error:', error);
+});
+
+solarWindStream.on('error', (error) => {
+  console.error('Solar wind stream error:', error);
 });
 
 app.get('/api/earthquakes/stream', (req: Request, res: Response) => {
@@ -170,6 +180,30 @@ app.get('/api/waves/stream', (req: Request, res: Response) => {
   });
 });
 
+app.get('/api/solar-wind/stream', (req: Request, res: Response) => {
+  if (!sseGate.tryAcquire()) {
+    res.status(503).json({ error: 'Solar wind stream connection limit reached' });
+    return;
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const writeSeries = (snapshot: SolarWindSeriesSnapshot) => {
+    res.write(`event: series\ndata: ${JSON.stringify(snapshot)}\n\n`);
+  };
+
+  writeSeries(solarWindStream.getSeriesSnapshot());
+  solarWindStream.on('series', writeSeries);
+
+  req.on('close', () => {
+    solarWindStream.off('series', writeSeries);
+    sseGate.release();
+  });
+});
+
 const clientDist = resolveClientDistDir(process.env, process.cwd());
 if (clientDist) {
   app.use(express.static(clientDist));
@@ -191,6 +225,7 @@ async function main() {
   await earthquakeStream.start();
   await tideStream.start();
   await waveStream.start();
+  await solarWindStream.start();
   app.listen(port, () => {
     const site = clientDist ? ` static=${clientDist}` : '';
     console.log(`Earthbeat server on http://localhost:${port} (auth=${getAuthMode()}${site})`);

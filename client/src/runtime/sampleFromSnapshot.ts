@@ -4,12 +4,16 @@ import type {
   ConnectorSample,
   NdbcWaveConnectorSample,
   NoaaConnectorSample,
+  SwpcSolarWindConnectorSample,
   UsgsConnectorSample,
 } from './channelFromSample';
 import {
+  sampleSolarWindPhase,
   sampleTideSeriesLevel,
   sampleWaveSeriesChannel,
   seriesAnchorTime,
+  solarWindStepIndex,
+  type SolarWindSeriesPoint,
   type TideSeriesPoint,
   type WaveSeriesPoint,
 } from './scrubSample';
@@ -31,10 +35,16 @@ export type WaveSeriesSnapshot = {
   points: WaveSeriesPoint[];
 };
 
+export type SolarWindSeriesSnapshot = {
+  kindKey: 'swpc_solar_wind';
+  points: SolarWindSeriesPoint[];
+};
+
 export type KindSnapshot =
   | UsgsQueueSnapshot
   | TideSeriesSnapshot
-  | WaveSeriesSnapshot;
+  | WaveSeriesSnapshot
+  | SolarWindSeriesSnapshot;
 
 export function isUsgsQueueSnapshot(value: unknown): value is UsgsQueueSnapshot {
   if (!value || typeof value !== 'object') return false;
@@ -52,6 +62,12 @@ export function isWaveSeriesSnapshot(value: unknown): value is WaveSeriesSnapsho
   if (!value || typeof value !== 'object') return false;
   const record = value as { kindKey?: unknown; points?: unknown };
   return record.kindKey === 'ndbc_buoy_waves' && Array.isArray(record.points);
+}
+
+export function isSolarWindSeriesSnapshot(value: unknown): value is SolarWindSeriesSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as { kindKey?: unknown; points?: unknown };
+  return record.kindKey === 'swpc_solar_wind' && Array.isArray(record.points);
 }
 
 export function sampleFromUsgsQueue(
@@ -109,6 +125,38 @@ export function sampleFromWaveSeries(
   };
 }
 
+export function sampleFromSolarWindSeries(
+  snapshot: SolarWindSeriesSnapshot,
+  phase: number,
+): SwpcSolarWindConnectorSample | null {
+  if (snapshot.points.length === 0) return null;
+  const speed = sampleSolarWindPhase(snapshot.points, phase, 'speed', { interpolate: true });
+  const speedStep = sampleSolarWindPhase(snapshot.points, phase, 'speed', { interpolate: false });
+  const density = sampleSolarWindPhase(snapshot.points, phase, 'density', { interpolate: true });
+  const densityStep = sampleSolarWindPhase(snapshot.points, phase, 'density', {
+    interpolate: false,
+  });
+  const bz = sampleSolarWindPhase(snapshot.points, phase, 'bz', { interpolate: true });
+  const bzStep = sampleSolarWindPhase(snapshot.points, phase, 'bz', { interpolate: false });
+  const time = seriesAnchorTime(
+    snapshot.points.map((point) => point.time),
+    phase,
+  );
+  const source = snapshot.points[solarWindStepIndex(snapshot.points.length, phase)]?.source ?? '';
+  return {
+    kindKey: 'swpc_solar_wind',
+    id: `scrub-${source}-${Math.floor(phase * 1000)}`,
+    source,
+    speed: speed ?? null,
+    speedStep: speedStep ?? null,
+    density: density ?? null,
+    densityStep: densityStep ?? null,
+    bz: bz ?? null,
+    bzStep: bzStep ?? null,
+    time,
+  };
+}
+
 export function sampleFromKindSnapshot(
   snapshot: KindSnapshot,
   clock: { mode: 'scrub'; phase: number } | { mode: 'queue'; cursor: number },
@@ -120,6 +168,9 @@ export function sampleFromKindSnapshot(
   if (clock.mode !== 'scrub') return null;
   if (snapshot.kindKey === 'noaa_coops_tides') {
     return sampleFromTideSeries(snapshot, clock.phase);
+  }
+  if (snapshot.kindKey === 'swpc_solar_wind') {
+    return sampleFromSolarWindSeries(snapshot, clock.phase);
   }
   return sampleFromWaveSeries(snapshot, clock.phase);
 }

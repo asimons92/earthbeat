@@ -6,6 +6,7 @@ import {
   type ConnectorSample,
   type NdbcWaveConnectorSample,
   type NoaaConnectorSample,
+  type SwpcSolarWindConnectorSample,
   type UsgsConnectorSample,
 } from './channelFromSample';
 
@@ -36,7 +37,17 @@ const ndbcArb: fc.Arbitrary<NdbcWaveConnectorSample> = fc.record({
   time: fc.integer({ min: 0, max: 2_000_000_000_000 }),
 });
 
-const sampleArb: fc.Arbitrary<ConnectorSample> = fc.oneof(usgsArb, noaaArb, ndbcArb);
+const swpcArb: fc.Arbitrary<SwpcSolarWindConnectorSample> = fc.record({
+  kindKey: fc.constant('swpc_solar_wind' as const),
+  id: fc.string({ minLength: 1, maxLength: 12 }),
+  source: fc.stringMatching(/^[A-Z][A-Z0-9]{1,7}$/),
+  speed: fc.option(fc.double({ min: 200, max: 1200, noNaN: true }), { nil: null }),
+  density: fc.option(fc.double({ min: 0, max: 40, noNaN: true }), { nil: null }),
+  bz: fc.option(fc.double({ min: -50, max: 50, noNaN: true }), { nil: null }),
+  time: fc.integer({ min: 0, max: 2_000_000_000_000 }),
+});
+
+const sampleArb: fc.Arbitrary<ConnectorSample> = fc.oneof(usgsArb, noaaArb, ndbcArb, swpcArb);
 const unknownKeyArb = fc
   .stringMatching(/^[a-z]{3,12}$/)
   .filter(
@@ -46,7 +57,10 @@ const unknownKeyArb = fc
       key !== 'sig' &&
       key !== 'waterLevel' &&
       key !== 'waveHeight' &&
-      key !== 'wavePeriod',
+      key !== 'wavePeriod' &&
+      key !== 'speed' &&
+      key !== 'density' &&
+      key !== 'bz',
   );
 
 describe('channelFromSample', () => {
@@ -132,6 +146,45 @@ describe('channelFromSample', () => {
           expect(channelFromSample(withStep, 'wavePeriod', { interpolate: true })).toBe(
             sample.wavePeriod,
           );
+        },
+      ),
+    );
+  });
+
+  it('round-trips speed, density, and bz from solar wind samples', () => {
+    fc.assert(
+      fc.property(swpcArb, fc.constantFrom('speed', 'density', 'bz'), (sample, key) => {
+        expect(channelFromSample(sample, key)).toBe(sample[key]);
+      }),
+    );
+  });
+
+  it('uses solar wind step channels when interpolate is off', () => {
+    fc.assert(
+      fc.property(
+        swpcArb.chain((sample) =>
+          fc.record({
+            sample: fc.constant(sample),
+            speedStep: fc.double({ min: 200, max: 1200, noNaN: true }),
+            densityStep: fc.double({ min: 0, max: 40, noNaN: true }),
+            bzStep: fc.double({ min: -50, max: 50, noNaN: true }),
+          }),
+        ),
+        ({ sample, speedStep, densityStep, bzStep }) => {
+          const withStep = {
+            ...sample,
+            speedStep,
+            densityStep,
+            bzStep,
+          };
+          expect(channelFromSample(withStep, 'speed', { interpolate: false })).toBe(speedStep);
+          expect(channelFromSample(withStep, 'density', { interpolate: false })).toBe(densityStep);
+          expect(channelFromSample(withStep, 'bz', { interpolate: false })).toBe(bzStep);
+          expect(channelFromSample(withStep, 'speed', { interpolate: true })).toBe(sample.speed);
+          expect(channelFromSample(withStep, 'density', { interpolate: true })).toBe(
+            sample.density,
+          );
+          expect(channelFromSample(withStep, 'bz', { interpolate: true })).toBe(sample.bz);
         },
       ),
     );

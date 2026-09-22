@@ -9,7 +9,12 @@ import {
 
 const idArb = fc.uuid();
 const sampleArb = fc.record({
-  kindKey: fc.constantFrom('usgs_earthquakes', 'noaa_coops_tides', 'ndbc_buoy_waves'),
+  kindKey: fc.constantFrom(
+    'usgs_earthquakes',
+    'noaa_coops_tides',
+    'ndbc_buoy_waves',
+    'swpc_solar_wind',
+  ),
   value: fc.double({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true }),
 });
 

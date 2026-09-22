@@ -33,10 +33,27 @@ export type NdbcWaveConnectorSample = {
   time: number;
 };
 
+export type SwpcSolarWindConnectorSample = {
+  kindKey: 'swpc_solar_wind';
+  id: string;
+  source: string;
+  speed: number | null;
+  /** Nearest scrub point; used when Connector interpolate is off. */
+  speedStep?: number | null;
+  density: number | null;
+  /** Nearest scrub point; used when Connector interpolate is off. */
+  densityStep?: number | null;
+  bz: number | null;
+  /** Nearest scrub point; used when Connector interpolate is off. */
+  bzStep?: number | null;
+  time: number;
+};
+
 export type ConnectorSample =
   | UsgsConnectorSample
   | NoaaConnectorSample
-  | NdbcWaveConnectorSample;
+  | NdbcWaveConnectorSample
+  | SwpcSolarWindConnectorSample;
 
 /** Read a numeric channel from a sample. Unknown keys return null (never invent). */
 export function channelFromSample(
@@ -73,6 +90,22 @@ export function channelFromSample(
         return sample.wavePeriodStep;
       }
       return sample.wavePeriod;
+    }
+    return null;
+  }
+  if (sample.kindKey === 'swpc_solar_wind') {
+    const interpolate = options?.interpolate !== false;
+    if (channelKey === 'speed') {
+      if (!interpolate && sample.speedStep != null) return sample.speedStep;
+      return sample.speed;
+    }
+    if (channelKey === 'density') {
+      if (!interpolate && sample.densityStep != null) return sample.densityStep;
+      return sample.density;
+    }
+    if (channelKey === 'bz') {
+      if (!interpolate && sample.bzStep != null) return sample.bzStep;
+      return sample.bz;
     }
     return null;
   }

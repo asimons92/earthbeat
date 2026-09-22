@@ -47,6 +47,7 @@ import {
   type SampleHistoryState,
 } from './sampleHistory';
 import {
+  isSolarWindSeriesSnapshot,
   isTideSeriesSnapshot,
   isUsgsQueueSnapshot,
   isWaveSeriesSnapshot,
@@ -459,6 +460,10 @@ export function usePatchRuntime(nodes: Node[], edges: Edge[]) {
             return;
           }
           if (isWaveSeriesSnapshot(parsed) && kindKey === 'ndbc_buoy_waves') {
+            applySnapshot(kindKey, parsed);
+            return;
+          }
+          if (isSolarWindSeriesSnapshot(parsed) && kindKey === 'swpc_solar_wind') {
             applySnapshot(kindKey, parsed);
             return;
           }

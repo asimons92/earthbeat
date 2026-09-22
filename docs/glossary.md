@@ -54,6 +54,8 @@ Do not put mapping parameters on React Flow edges. Mapping belongs on a Modulato
 
 `ndbc_buoy_waves` is the third ConnectorKind. It uses the NDBC standard meteorological realtime2 text file. The default buoy is `46026` (San Francisco). Modulatable channels are `waveHeight` (WVHT) and `wavePeriod` (DPD). Display channels include `time` and `stationId`. The server polls about every thirty minutes and scrubs a recent window into a slow loop over SSE at `/api/waves/stream`.
 
+`swpc_solar_wind` is the fourth ConnectorKind. It uses the NOAA SWPC one-minute RTSW wind and magnetometer files. The server keeps rows where `active` is true and the wind source matches the magnetometer source. Modulatable channels are `speed`, `density`, and `bz`. Display channels include `time` and `source`. The server polls about every minute and scrubs about one day into a 120 second loop over SSE at `/api/solar-wind/stream`.
+
 Oscillator defaults are waveform `sine`, frequencyHz `220`, and gain `0.2`, with Elementary as the audio runtime. Waveform choices are `sine`, `square`, `saw`, and `noise`. Modulatable params are `frequencyHz` and `gain`.
 
 Scale Snap Effect defaults are tonic `C`, scale `major`, enabled on, and A4 at `440` Hz. Catalog scales are major, natural minor, major pentatonic, and minor pentatonic.

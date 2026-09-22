@@ -55,7 +55,8 @@ function normalizeSample(sample: ConnectorSample | EarthquakeSample | null): Con
   if (
     sample.kindKey === 'noaa_coops_tides' ||
     sample.kindKey === 'usgs_earthquakes' ||
-    sample.kindKey === 'ndbc_buoy_waves'
+    sample.kindKey === 'ndbc_buoy_waves' ||
+    sample.kindKey === 'swpc_solar_wind'
   ) {
     return sample as ConnectorSample;
   }
@@ -80,6 +81,7 @@ function samplesMapFrom(
     (asRecord.kindKey === 'usgs_earthquakes' ||
       asRecord.kindKey === 'noaa_coops_tides' ||
       asRecord.kindKey === 'ndbc_buoy_waves' ||
+      asRecord.kindKey === 'swpc_solar_wind' ||
       asRecord.kindKey === undefined);
   if (looksLikeSingleSample) {
     // Single sample without connector id cannot drive per-node lookup.

@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { mapRange } from './mapRange';
+import type { ConnectorSample } from './channelFromSample';
 import {
   modulateFrequencyFromBase,
   resolveVoiceParams,
@@ -295,6 +296,67 @@ describe('resolveVoiceParams', () => {
               outMax,
               restingFreq,
             ),
+          );
+        },
+      ),
+    );
+  });
+
+  it('modulates frequency from a matching swpc_solar_wind speed sample', () => {
+    fc.assert(
+      fc.property(
+        idArb,
+        idArb,
+        idArb,
+        fc.double({ min: 200, max: 1200, noNaN: true, noDefaultInfinity: true }),
+        sampleArb,
+        audioHz,
+        (connId, modId, oscId, speed, usgsSample, restingFreq) => {
+          fc.pre(new Set([connId, modId, oscId]).size === 3);
+          const inMin = 300;
+          const inMax = 800;
+          const outMin = 0.5;
+          const outMax = 4;
+          const solarSample = {
+            kindKey: 'swpc_solar_wind' as const,
+            id: connId,
+            source: 'SOLAR1',
+            speed,
+            density: null,
+            bz: null,
+            time: usgsSample.time,
+          } as unknown as ConnectorSample;
+          const nodes: RuntimeNode[] = [
+            { id: connId, type: 'connector', data: { kindKey: 'swpc_solar_wind' } },
+            {
+              id: modId,
+              type: 'modulator',
+              data: {
+                channelKey: 'speed',
+                targetParam: 'frequencyHz',
+                inMin,
+                inMax,
+                outMin,
+                outMax,
+              },
+            },
+            {
+              id: oscId,
+              type: 'oscillator',
+              data: { frequencyHz: restingFreq, gain: 0.2, waveform: 'sine' },
+            },
+          ];
+          const edges: RuntimeEdge[] = [
+            { id: 'a', source: connId, target: modId },
+            { id: 'b', source: modId, target: oscId },
+          ];
+          const withSolar = resolveVoiceParams(nodes, edges, oscId, { [connId]: solarSample });
+          const withUsgs = resolveVoiceParams(nodes, edges, oscId, { [connId]: usgsSample });
+          const matched = true;
+          expect(withUsgs.frequencyHz).toBe(restingFreq);
+          expect(withSolar.modulated).toBe(matched);
+          expect(withSolar.frequencyHz).toBe(
+            modulateFrequencyFromBase(speed, inMin, inMax, outMin, outMax, restingFreq),
           );
         },
       ),
