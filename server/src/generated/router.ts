@@ -13,8 +13,12 @@ import {
   patchDelete,
   patchGet,
   patchList,
+  patchCopyFromShare,
+  patchGetByShareToken,
+  patchPublishShare,
   patchRename,
   patchReplaceGraph,
+  patchRevokeShare,
 } from './handlers.js';
 
 const t = initTRPC.context<TrpcContext>().create();
@@ -184,6 +188,42 @@ export const appRouter = t.router({
       .mutation(async ({ ctx, input }) => {
         try {
           return await patchReplaceGraph(ctx.user.id, input);
+        } catch (error) {
+          mapError(error);
+        }
+      }),
+    publishShare: authed
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await patchPublishShare(ctx.user.id, input);
+        } catch (error) {
+          mapError(error);
+        }
+      }),
+    revokeShare: authed
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await patchRevokeShare(ctx.user.id, input);
+        } catch (error) {
+          mapError(error);
+        }
+      }),
+    getByShareToken: t.procedure
+      .input(z.object({ token: z.string().min(1) }))
+      .query(async ({ input }) => {
+        try {
+          return await patchGetByShareToken(input);
+        } catch (error) {
+          mapError(error);
+        }
+      }),
+    copyFromShare: authed
+      .input(z.object({ token: z.string().min(1), name: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await patchCopyFromShare(ctx.user.id, input);
         } catch (error) {
           mapError(error);
         }

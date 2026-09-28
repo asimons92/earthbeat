@@ -14,12 +14,13 @@ export type UserPatchListItem = {
   id: string;
   name: string;
   version: number;
+  shareToken?: string | null;
 };
 
 /** One row in the Patch Library list. */
 export type PatchLibraryEntry =
   | { kind: 'starter'; key: string; name: string }
-  | { kind: 'user'; id: string; name: string; version: number };
+  | { kind: 'user'; id: string; name: string; version: number; shareToken: string | null };
 
 /** Working canvas snapshot after opening a starter (unsaved, Play stopped). */
 export type StarterWorkingSnapshot = {
@@ -64,6 +65,7 @@ export function buildPatchLibraryEntries(input: {
       id: patch.id,
       name: patch.name,
       version: patch.version,
+      shareToken: patch.shareToken ?? null,
     })),
   ];
 }

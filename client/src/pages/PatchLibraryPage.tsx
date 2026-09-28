@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { shellPatchFileActions } from '@/generated/catalog';
+import { libraryRowDetail } from '@/persist/shareSession';
 import { decideDirtyNavigation } from '@/persist/patchFileActions';
 import { DeletePatchDialog, DiscardChangesDialog } from '@/shell/PatchFileDialogs';
 import {
@@ -27,6 +28,7 @@ export function PatchLibraryPage() {
   } = usePatchWorkspace();
 
   const deleteAction = shellPatchFileActions.find((action) => action.key === 'delete');
+  const sharedMark = shellPatchFileActions.find((action) => action.key === 'sharedMark');
 
   const [pendingOpen, setPendingOpen] = useState<PendingOpen | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -45,6 +47,7 @@ export function PatchLibraryPage() {
           id: patch.id,
           name: patch.name,
           version: Number(patch.version),
+          shareToken: typeof patch.shareToken === 'string' ? patch.shareToken : null,
         }))
       : null,
   });
@@ -129,8 +132,15 @@ export function PatchLibraryPage() {
                       onUserClick(entry.id);
                     }}
                   >
-                    <span className="library__row-label">{entry.name}</span>
-                    <span className="library__row-desc">{entry.id}</span>
+                    <span className="library__row-title">
+                      <span className="library__row-label">{entry.name}</span>
+                      {sharedMark && libraryRowDetail(entry.id, entry.shareToken).mark === 'shared' ? (
+                        <span className="library__row-mark">{sharedMark.label}</span>
+                      ) : null}
+                    </span>
+                    <span className="library__row-desc">
+                      {libraryRowDetail(entry.id, entry.shareToken).label}
+                    </span>
                   </button>
                   {deleteAction ? (
                     <Button

@@ -19,11 +19,26 @@ import {
   shouldSuppressDraftForFingerprint,
 } from '@/persist/patchPersistRaces';
 import { decideSessionBootstrap } from '@/persist/sessionBootstrap';
-import { domainGraphToFlow, flowToDomainGraph } from '@/persist/graphMapper';
+import { domainGraphToFlow, flowToDomainGraph, type DomainGraph } from '@/persist/graphMapper';
 import { listStarterPatches, starterWorkingSnapshot } from '@/starters/starterLibrary';
 import { trpc } from '@/trpc';
 
 export type PersistStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict' | 'draft_error';
+
+export type ShareVisitState = {
+  token: string;
+  name: string;
+};
+
+type ShareCanvasStash = {
+  activePatchId: string | null;
+  activePatchName: string;
+  patchVersion: number;
+  isDirty: boolean;
+  persistStatus: PersistStatus;
+  nodes: Node[];
+  edges: Edge[];
+};
 
 type UsePatchPersistArgs = {
   nodes: Node[];
@@ -70,6 +85,15 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     flowGraphFingerprint([], []),
   );
   const draftBootstrappedRef = useRef(false);
+  const shareBlocksRef = useRef(false);
+  const shareTokenRef = useRef<string | null>(null);
+  const shareStashRef = useRef<ShareCanvasStash | null>(null);
+  const persistStatusRef = useRef<PersistStatus>('idle');
+  const [shareVisit, setShareVisit] = useState<ShareVisitState | null>(null);
+  const [shareRouteHold, setShareRouteHold] = useState(false);
+  const [shareLocked, setShareLocked] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [shareMissing, setShareMissing] = useState(false);
 
   const markClean = useCallback(() => {
     dirtyRef.current = false;
@@ -98,7 +122,8 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     versionRef.current = patchVersion;
     patchIdRef.current = activePatchId;
     patchNameRef.current = activePatchName;
-  }, [nodes, edges, patchVersion, activePatchId, activePatchName]);
+    persistStatusRef.current = persistStatus;
+  }, [nodes, edges, patchVersion, activePatchId, activePatchName, persistStatus]);
 
   const utils = trpc.useUtils();
   const listQuery = trpc.patch.list.useQuery(undefined, { enabled: sessionReady });
@@ -110,6 +135,12 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   const deleteMutateRef = useRef(deleteMutation.mutateAsync);
   const invalidateListRef = useRef(utils.patch.list.invalidate);
   const fetchPatchRef = useRef(utils.patch.get.fetch);
+  const publishMutation = trpc.patch.publishShare.useMutation();
+  const revokeMutation = trpc.patch.revokeShare.useMutation();
+  const copyMutation = trpc.patch.copyFromShare.useMutation();
+  const publishMutateRef = useRef(publishMutation.mutateAsync);
+  const revokeMutateRef = useRef(revokeMutation.mutateAsync);
+  const copyMutateRef = useRef(copyMutation.mutateAsync);
 
   useEffect(() => {
     replaceMutateRef.current = replaceMutation.mutateAsync;
@@ -117,10 +148,16 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     deleteMutateRef.current = deleteMutation.mutateAsync;
     invalidateListRef.current = utils.patch.list.invalidate;
     fetchPatchRef.current = utils.patch.get.fetch;
+    publishMutateRef.current = publishMutation.mutateAsync;
+    revokeMutateRef.current = revokeMutation.mutateAsync;
+    copyMutateRef.current = copyMutation.mutateAsync;
   }, [
     replaceMutation.mutateAsync,
     createMutation.mutateAsync,
     deleteMutation.mutateAsync,
+    publishMutation.mutateAsync,
+    revokeMutation.mutateAsync,
+    copyMutation.mutateAsync,
     utils.patch.list.invalidate,
     utils.patch.get.fetch,
   ]);
@@ -138,6 +175,9 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
 
   const flushDraft = useCallback(
     (dirty: boolean) => {
+      if (shareBlocksRef.current) {
+        return { ok: true, sink: 'memory' as const };
+      }
       const result = writeCanvasDraft(userIdRef.current, buildDraftPayload(dirty));
       if (!result.ok) {
         setPersistStatus('draft_error');
@@ -241,6 +281,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           if (!draftBootstrappedRef.current) {
             draftBootstrappedRef.current = true;
             bootCanvasForUser(null);
+            setDraftReady(true);
           }
           return;
         }
@@ -261,6 +302,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           if (!draftBootstrappedRef.current) {
             draftBootstrappedRef.current = true;
             bootCanvasForUser(userId);
+            setDraftReady(true);
           }
           return;
         }
@@ -275,6 +317,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
             if (!draftBootstrappedRef.current) {
               draftBootstrappedRef.current = true;
               bootCanvasForUser(null);
+              setDraftReady(true);
             }
             return;
           }
@@ -287,6 +330,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
           if (!draftBootstrappedRef.current) {
             draftBootstrappedRef.current = true;
             bootCanvasForUser(userId);
+            setDraftReady(true);
           }
           return;
         }
@@ -295,6 +339,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         if (!draftBootstrappedRef.current) {
           draftBootstrappedRef.current = true;
           bootCanvasForUser(null);
+          setDraftReady(true);
         }
       } catch {
         userIdRef.current = null;
@@ -302,6 +347,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
         if (!draftBootstrappedRef.current) {
           draftBootstrappedRef.current = true;
           bootCanvasForUser(null);
+          setDraftReady(true);
         }
       }
     })();
@@ -322,6 +368,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
 
   const saveNow = useCallback(async () => {
     const patchId = patchIdRef.current;
+    if (shareBlocksRef.current) return;
     if (!patchId) return;
     if (saveInFlightRef.current) return;
     cancelDraftTimer();
@@ -372,6 +419,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
   }, [cancelDraftTimer, flushDraft, markClean]);
 
   const scheduleDraftPersist = useCallback(() => {
+    if (shareBlocksRef.current) return;
     const liveFingerprint = flowGraphFingerprint(nodesRef.current, edgesRef.current);
     if (
       shouldSuppressDraftForFingerprint(suppressFingerprintRef.current, liveFingerprint)
@@ -390,6 +438,7 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
 
   const createPatch = useCallback(
     async (name: string) => {
+      if (shareBlocksRef.current) return undefined;
       if (shouldBlockCanvasMutation(saveInFlightRef.current)) return undefined;
       cancelDraftTimer();
       saveInFlightRef.current = true;
@@ -525,6 +574,186 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     await loadPatch(patchId);
   }, [loadPatch]);
 
+  const enterSharedPatch = useCallback(
+    (input: { token: string; name: string; graph: DomainGraph; discardDirty: boolean }): boolean => {
+      if (shouldBlockCanvasMutation(saveInFlightRef.current)) return false;
+      if (shareBlocksRef.current) {
+        const flow = domainGraphToFlow(input.graph);
+        shareTokenRef.current = input.token;
+        setShareLocked(true);
+        setShareVisit({ token: input.token, name: input.name });
+        markProgrammaticGraph(flow.nodes, flow.edges);
+        setActivePatchId(null);
+        setActivePatchName(input.name);
+        patchIdRef.current = null;
+        patchNameRef.current = input.name;
+        markClean();
+        setNodes(flow.nodes);
+        setEdges(flow.edges);
+        nodesRef.current = flow.nodes;
+        edgesRef.current = flow.edges;
+        return true;
+      }
+      cancelDraftTimer();
+      if (input.discardDirty) {
+        shareStashRef.current = null;
+      } else {
+        shareStashRef.current = {
+          activePatchId: patchIdRef.current,
+          activePatchName: patchNameRef.current,
+          patchVersion: versionRef.current,
+          isDirty: dirtyRef.current,
+          persistStatus: persistStatusRef.current,
+          nodes: nodesRef.current.map((node) => ({
+            ...node,
+            position: { ...node.position },
+            data: { ...(node.data as Record<string, unknown>) },
+          })),
+          edges: edgesRef.current.map((edge) => ({ ...edge })),
+        };
+      }
+      const flow = domainGraphToFlow(input.graph);
+      shareBlocksRef.current = true;
+      shareTokenRef.current = input.token;
+      setShareLocked(true);
+      setShareRouteHold(false);
+      setShareVisit({ token: input.token, name: input.name });
+      markProgrammaticGraph(flow.nodes, flow.edges);
+      setActivePatchId(null);
+      setActivePatchName(input.name);
+      patchIdRef.current = null;
+      patchNameRef.current = input.name;
+      markClean();
+      setNodes(flow.nodes);
+      setEdges(flow.edges);
+      nodesRef.current = flow.nodes;
+      edgesRef.current = flow.edges;
+      setPersistStatus('idle');
+      persistStatusRef.current = 'idle';
+      return true;
+    },
+    [cancelDraftTimer, markClean, markProgrammaticGraph, setEdges, setNodes],
+  );
+
+  const failSharedPatch = useCallback(() => {
+    cancelDraftTimer();
+    if (!shareBlocksRef.current) {
+      shareStashRef.current = {
+        activePatchId: patchIdRef.current,
+        activePatchName: patchNameRef.current,
+        patchVersion: versionRef.current,
+        isDirty: dirtyRef.current,
+        persistStatus: persistStatusRef.current,
+        nodes: nodesRef.current.map((node) => ({
+          ...node,
+          position: { ...node.position },
+          data: { ...(node.data as Record<string, unknown>) },
+        })),
+        edges: edgesRef.current.map((edge) => ({ ...edge })),
+      };
+      shareBlocksRef.current = true;
+    }
+    shareTokenRef.current = null;
+    setShareLocked(true);
+    setShareVisit(null);
+    markProgrammaticGraph([], []);
+    setActivePatchId(null);
+    setActivePatchName(BLANK_PATCH_NAME);
+    patchIdRef.current = null;
+    patchNameRef.current = BLANK_PATCH_NAME;
+    markClean();
+    setNodes([]);
+    setEdges([]);
+    nodesRef.current = [];
+    edgesRef.current = [];
+    setPersistStatus('idle');
+    persistStatusRef.current = 'idle';
+  }, [cancelDraftTimer, markClean, markProgrammaticGraph, setEdges, setNodes]);
+
+  const leaveSharedPatch = useCallback(() => {
+    if (!shareBlocksRef.current) return;
+    const stash = shareStashRef.current;
+    shareBlocksRef.current = false;
+    shareTokenRef.current = null;
+    shareStashRef.current = null;
+    setShareLocked(false);
+    setShareVisit(null);
+    if (!stash) {
+      newBlankPatch();
+      return;
+    }
+    cancelDraftTimer();
+    markProgrammaticGraph(stash.nodes, stash.edges);
+    setActivePatchId(stash.activePatchId);
+    setActivePatchName(stash.activePatchName);
+    setPatchVersion(stash.patchVersion);
+    patchIdRef.current = stash.activePatchId;
+    patchNameRef.current = stash.activePatchName;
+    versionRef.current = stash.patchVersion;
+    if (stash.isDirty) {
+      markDirty();
+    } else {
+      markClean();
+    }
+    setNodes(stash.nodes);
+    setEdges(stash.edges);
+    nodesRef.current = stash.nodes;
+    edgesRef.current = stash.edges;
+    setPersistStatus(stash.persistStatus);
+    persistStatusRef.current = stash.persistStatus;
+  }, [cancelDraftTimer, markClean, markDirty, markProgrammaticGraph, newBlankPatch, setEdges, setNodes]);
+
+  const publishShare = useCallback(async () => {
+    const id = patchIdRef.current;
+    if (!id || shareBlocksRef.current) return undefined;
+    const result = await publishMutateRef.current({ id });
+    await invalidateListRef.current();
+    return result;
+  }, []);
+
+  const revokeShare = useCallback(async () => {
+    const id = patchIdRef.current;
+    if (!id || shareBlocksRef.current) return undefined;
+    const result = await revokeMutateRef.current({ id });
+    await invalidateListRef.current();
+    return result;
+  }, []);
+
+  const saveSharedCopy = useCallback(
+    async (name: string) => {
+      const token = shareTokenRef.current;
+      if (!token) return undefined;
+      if (shouldBlockCanvasMutation(saveInFlightRef.current)) return undefined;
+      setShareRouteHold(true);
+      setPersistStatus('saving');
+      persistStatusRef.current = 'saving';
+      try {
+        const created = await copyMutateRef.current({ token, name });
+        shareBlocksRef.current = false;
+        shareTokenRef.current = null;
+        shareStashRef.current = null;
+        setShareLocked(false);
+        setShareVisit(null);
+        await loadPatch(created.id);
+        return created;
+      } catch {
+        setShareRouteHold(false);
+        setPersistStatus('error');
+        persistStatusRef.current = 'error';
+        return undefined;
+      }
+    },
+    [loadPatch],
+  );
+
+  const releaseShareRouteHold = useCallback(() => {
+    setShareRouteHold(false);
+  }, []);
+
+  const reportShareMissing = useCallback((missing: boolean) => {
+    setShareMissing(missing);
+  }, []);
+
   return {
     sessionReady,
     authMode,
@@ -544,5 +773,18 @@ export function usePatchPersist({ nodes, edges, setNodes, setEdges }: UsePatchPe
     deletePatch,
     resolveConflictByReload,
     isLoadingList: listQuery.isLoading,
+    draftReady,
+    shareVisit,
+    shareRouteHold,
+    shareMissing,
+    graphLocked: shareLocked,
+    enterSharedPatch,
+    failSharedPatch,
+    leaveSharedPatch,
+    publishShare,
+    revokeShare,
+    saveSharedCopy,
+    releaseShareRouteHold,
+    reportShareMissing,
   };
 }

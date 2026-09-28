@@ -6,7 +6,7 @@ Shared nouns and verbs for Earthbeat. Use these names in the model, the UI, and 
 
 User is a signed-in person. The model stores identity fields such as email and provider subject. Auth glue (for example Google OAuth) creates or updates the User. It does not belong in the domain model as token detail.
 
-Patch is the saved graph that a User owns. The Patch is the unit you create, rename, open, and delete. Do not use the word Pipeline.
+Patch is the saved graph that a User owns. The Patch is the unit you create, rename, open, and delete. A share token is an unguessable id on a Patch. A link with that token opens the saved graph. The Patch id stays private. Do not use the word Pipeline.
 
 Connector is a natural-signal node on the canvas. Example: a USGS Quakes node on the Pacific Quake Patch. A Connector lists Channels from its ConnectorKind.
 
@@ -37,6 +37,8 @@ Monitor is the output panel under the canvas. While Play is on, it shows one Cha
 upsertFromAuth creates or updates a User from a provider profile on the server (Auth.js or local bootstrap). It is not a public tRPC procedure.
 
 create, rename, delete, list, get, and replaceGraph act on a Patch. replaceGraph saves the full node and Wire set in one transaction and bumps Patch.version.
+
+publishShare and revokeShare set or clear the share token. They do not bump Patch.version. getByShareToken is a public read of the name and graph. copyFromShare creates a new Patch for the signed-in User from that graph.
 
 add, move, updateConfig or updateParams or updateMapping, and remove act on Connector, Modulator, Oscillator, Effect, and Wire nodes.
 

@@ -147,6 +147,19 @@ type PatchWorkspaceValue = {
   blankForSignOut: () => void;
   deletePatch: (id: string, expectedVersion: number) => Promise<{ wasActive: boolean }>;
   resolveConflictByReload: () => Promise<void>;
+  draftReady: boolean;
+  shareVisit: ReturnType<typeof usePatchPersist>['shareVisit'];
+  shareRouteHold: boolean;
+  shareMissing: boolean;
+  graphLocked: boolean;
+  enterSharedPatch: ReturnType<typeof usePatchPersist>['enterSharedPatch'];
+  failSharedPatch: () => void;
+  leaveSharedPatch: () => void;
+  publishShare: ReturnType<typeof usePatchPersist>['publishShare'];
+  revokeShare: ReturnType<typeof usePatchPersist>['revokeShare'];
+  saveSharedCopy: ReturnType<typeof usePatchPersist>['saveSharedCopy'];
+  releaseShareRouteHold: () => void;
+  reportShareMissing: (missing: boolean) => void;
   liveStatus: ReturnType<typeof usePatchRuntime>['liveStatus'];
   lastSample: ReturnType<typeof usePatchRuntime>['lastSample'];
   lastSamplesByKind: ReturnType<typeof usePatchRuntime>['lastSamplesByKind'];
@@ -167,6 +180,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   const persist = usePatchPersist({ nodes, edges, setNodes, setEdges });
+  const graphLocked = persist.graphLocked;
   const {
     scheduleDraftPersist,
     loadPatch: persistLoadPatch,
@@ -241,16 +255,26 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
 
   const onNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChangeBase>[0]) => {
-      onNodesChangeBase(changes);
+      if (!graphLocked) {
+        onNodesChangeBase(changes);
+        return;
+      }
+      const selection = changes.filter((change) => change.type === 'select');
+      if (selection.length > 0) onNodesChangeBase(selection);
     },
-    [onNodesChangeBase],
+    [graphLocked, onNodesChangeBase],
   );
 
   const onEdgesChange = useCallback(
     (changes: Parameters<typeof onEdgesChangeBase>[0]) => {
-      onEdgesChangeBase(changes);
+      if (!graphLocked) {
+        onEdgesChangeBase(changes);
+        return;
+      }
+      const selection = changes.filter((change) => change.type === 'select');
+      if (selection.length > 0) onEdgesChangeBase(selection);
     },
-    [onEdgesChangeBase],
+    [graphLocked, onEdgesChangeBase],
   );
 
   const onToggleOscillatorPlay = useCallback(
@@ -300,13 +324,14 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
 
   const onConnect = useCallback<OnConnect>(
     (connection) => {
+      if (graphLocked) return;
       setEdges((currentEdges) => {
         const nextEdges = addEdge(connection, currentEdges);
         setNodes((currentNodes) => applyModulatorAutofills(currentNodes, nextEdges));
         return nextEdges;
       });
     },
-    [setEdges, setNodes],
+    [graphLocked, setEdges, setNodes],
   );
 
   const isValidConnection = useCallback(
@@ -321,14 +346,16 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
 
   const onChangeNodeData = useCallback(
     (nodeId: string, data: Record<string, unknown>) => {
+      if (graphLocked) return;
       setNodes((current) =>
         current.map((node) => (node.id === nodeId ? { ...node, data } : node)),
       );
     },
-    [setNodes],
+    [graphLocked, setNodes],
   );
 
   const addOscillator = useCallback(() => {
+    if (graphLocked) return;
     setNodes((current) => {
       const index = current.filter((node) => node.type === 'oscillator').length;
       const position = nextOffset(current.length);
@@ -346,9 +373,10 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       };
       return [...current, node];
     });
-  }, [setNodes]);
+  }, [graphLocked, setNodes]);
 
   const addModulator = useCallback(() => {
+    if (graphLocked) return;
     setNodes((current) => {
       const index = current.filter((node) => node.type === 'modulator').length;
       const position = nextOffset(current.length);
@@ -360,10 +388,11 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       };
       return [...current, node];
     });
-  }, [setNodes]);
+  }, [graphLocked, setNodes]);
 
   const addConnector = useCallback(
     (kindKey: string) => {
+      if (graphLocked) return false;
       if (!(kindKey in connectorKindsByKey)) return false;
       setNodes((current) => {
         const index = current.filter((node) => node.type === 'connector').length;
@@ -380,11 +409,12 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       });
       return true;
     },
-    [setNodes],
+    [graphLocked, setNodes],
   );
 
   const addEffect = useCallback(
     (kindKey: string) => {
+      if (graphLocked) return false;
       if (!(kindKey in effectKindsByKey)) return false;
       setNodes((current) => {
         const index = current.filter((node) => node.type === 'effect').length;
@@ -401,11 +431,12 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       });
       return true;
     },
-    [setNodes],
+    [graphLocked, setNodes],
   );
 
   const removeNode = useCallback(
     (nodeId: string) => {
+      if (graphLocked) return;
       const removeIds = new Set([nodeId]);
       setNodes((current) => current.filter((node) => !removeIds.has(node.id)));
       setEdges((current) =>
@@ -413,7 +444,7 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       );
       setSelectedNodeId((current) => (current === nodeId ? null : current));
     },
-    [setEdges, setNodes],
+    [graphLocked, setEdges, setNodes],
   );
 
   const value = useMemo<PatchWorkspaceValue>(
@@ -448,6 +479,19 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       blankForSignOut,
       deletePatch,
       resolveConflictByReload,
+      draftReady: persist.draftReady,
+      shareVisit: persist.shareVisit,
+      shareRouteHold: persist.shareRouteHold,
+      shareMissing: persist.shareMissing,
+      graphLocked: persist.graphLocked,
+      enterSharedPatch: persist.enterSharedPatch,
+      failSharedPatch: persist.failSharedPatch,
+      leaveSharedPatch: persist.leaveSharedPatch,
+      publishShare: persist.publishShare,
+      revokeShare: persist.revokeShare,
+      saveSharedCopy: persist.saveSharedCopy,
+      releaseShareRouteHold: persist.releaseShareRouteHold,
+      reportShareMissing: persist.reportShareMissing,
       liveStatus,
       lastSample,
       lastSamplesByKind,
@@ -490,6 +534,19 @@ export function PatchWorkspaceProvider({ children }: { children: ReactNode }) {
       blankForSignOut,
       deletePatch,
       resolveConflictByReload,
+      persist.draftReady,
+      persist.shareVisit,
+      persist.shareRouteHold,
+      persist.shareMissing,
+      persist.graphLocked,
+      persist.enterSharedPatch,
+      persist.failSharedPatch,
+      persist.leaveSharedPatch,
+      persist.publishShare,
+      persist.revokeShare,
+      persist.saveSharedCopy,
+      persist.releaseShareRouteHold,
+      persist.reportShareMissing,
       liveStatus,
       lastSample,
       lastSamplesByKind,

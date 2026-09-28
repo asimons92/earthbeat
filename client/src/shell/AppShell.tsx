@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import {
   shellNavItems,
   shellPatchFileActions,
 } from '@/generated/catalog';
+import { decideShareOffer } from '@/persist/shareSession';
 import { decideAuthChrome } from '@/persist/sessionBootstrap';
 import {
   decideDirtyNavigation,
@@ -18,7 +19,8 @@ import { startGoogleSignIn, startSignOut } from '@/persist/authActions';
 import { ThemeToggle } from '@/theme/ThemeToggle';
 import { usePatchWorkspace } from '@/workspace/PatchWorkspace';
 import { OutputMonitor } from '@/shell/OutputMonitor';
-import { DiscardChangesDialog, PatchNameDialog } from '@/shell/PatchFileDialogs';
+import { DiscardChangesDialog, PatchNameDialog, SharePatchDialog } from '@/shell/PatchFileDialogs';
+import { ShareVisit } from '@/shell/ShareVisit';
 
 function persistLabel(status: string) {
   if (status === 'saving') return 'Saving…';
@@ -59,10 +61,20 @@ export function AppShell() {
     stopAllOscillators,
     newBlankPatch,
     blankForSignOut,
+    graphLocked,
+    shareVisit,
+    publishShare,
+    revokeShare,
   } = usePatchWorkspace();
 
   const [discardOpen, setDiscardOpen] = useState(false);
   const [nameDialogMode, setNameDialogMode] = useState<NameDialogMode>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareFailed, setShareFailed] = useState(false);
+  const shareBusyRef = useRef(false);
+  const shareEpochRef = useRef(0);
 
   const authChrome = decideAuthChrome({ authMode, sessionReady });
   const googleSignInAction = shellAuthActions.find((action) => action.key === 'google_sign_in');
@@ -73,9 +85,76 @@ export function AppShell() {
       new: shellPatchFileActions.find((action) => action.key === 'new'),
       save: shellPatchFileActions.find((action) => action.key === 'save'),
       saveAs: shellPatchFileActions.find((action) => action.key === 'saveAs'),
+      share: shellPatchFileActions.find((action) => action.key === 'share'),
+      stopSharing: shellPatchFileActions.find((action) => action.key === 'stopSharing'),
+      copyLink: shellPatchFileActions.find((action) => action.key === 'copyLink'),
+      sharedMark: shellPatchFileActions.find((action) => action.key === 'sharedMark'),
     }),
     [],
   );
+
+  const shareOffer = decideShareOffer(
+    graphLocked
+      ? { kind: 'shared' }
+      : { kind: 'owned', patchId: activePatchId },
+  );
+
+  const publishLink = async () => {
+    if (shareBusyRef.current) return;
+    shareBusyRef.current = true;
+    setShareBusy(true);
+    setShareFailed(false);
+    const startedEpoch = shareEpochRef.current;
+    let published: { shareToken: string } | undefined;
+    try {
+      published = await publishShare();
+    } catch {
+      published = undefined;
+    }
+    if (shareEpochRef.current !== startedEpoch) {
+      try {
+        await revokeShare();
+      } catch {
+        // Stop already asked for the link to be off.
+      }
+      shareBusyRef.current = false;
+      setShareBusy(false);
+      setShareLink(null);
+      return;
+    }
+    shareBusyRef.current = false;
+    setShareBusy(false);
+    if (!published) {
+      setShareLink(null);
+      setShareFailed(true);
+      return;
+    }
+    const url = new URL(`/share/${published.shareToken}`, window.location.origin);
+    setShareLink(url.href);
+  };
+
+  const onShareClick = () => {
+    if (shareBusyRef.current) return;
+    setShareOpen(true);
+    void publishLink();
+  };
+
+  const onStopShare = () => {
+    shareEpochRef.current += 1;
+    setShareLink(null);
+    setShareFailed(false);
+    if (shareBusyRef.current) return;
+    shareBusyRef.current = true;
+    setShareBusy(true);
+    void revokeShare()
+      .then((result) => {
+        if (!result) setShareFailed(true);
+      })
+      .finally(() => {
+        shareBusyRef.current = false;
+        setShareBusy(false);
+      });
+  };
 
   const runNew = () => {
     newBlankPatch();
@@ -200,6 +279,17 @@ export function AppShell() {
                   {fileActions.saveAs.label}
                 </Button>
               ) : null}
+              {fileActions.share && shareOffer === 'offer' ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onShareClick}
+                  disabled={shareBusy}
+                >
+                  {fileActions.share.label}
+                </Button>
+              ) : null}
             </>
           ) : null}
           {authChrome === 'signIn' && googleSignInAction ? (
@@ -232,7 +322,9 @@ export function AppShell() {
             </Button>
           ) : null}
           <span className="shell__persist-status" data-status={persistStatus}>
-            {persistLabel(persistStatus)}
+            {shareVisit && fileActions.sharedMark
+              ? fileActions.sharedMark.label
+              : persistLabel(persistStatus)}
           </span>
           {persistStatus === 'conflict' ? (
             <Button
@@ -270,7 +362,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <div className="shell__body">
+      <div className={graphLocked ? 'shell__body shell__body--locked' : 'shell__body'}>
         <nav className="shell__sidebar" aria-label="Primary">
           {shellNavItems.map((item) => (
             <NavLink
@@ -307,6 +399,27 @@ export function AppShell() {
         onDiscard={() => {
           setDiscardOpen(false);
           runNew();
+        }}
+      />
+
+      <ShareVisit />
+
+      <SharePatchDialog
+        open={shareOpen}
+        link={shareLink}
+        busy={shareBusy}
+        failed={shareFailed}
+        shareLabel={fileActions.share?.label ?? ''}
+        stopLabel={fileActions.stopSharing?.label ?? ''}
+        copyLabel={fileActions.copyLink?.label ?? ''}
+        onClose={() => setShareOpen(false)}
+        onPublish={() => {
+          void publishLink();
+        }}
+        onStop={onStopShare}
+        onCopy={() => {
+          if (!shareLink) return;
+          void navigator.clipboard.writeText(shareLink);
         }}
       />
 

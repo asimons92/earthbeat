@@ -7,28 +7,28 @@
       "output": ".",
       "generated_files": {
         "client/src/generated/catalog.ts": {
-          "md5": "c1fdead9af3e466764e8b1e43f5949a5",
-          "date": "2026-09-22T20:18:29.089Z"
+          "md5": "d555030fb32933cad65e9e88d935caef",
+          "date": "2026-09-28T13:16:21.770Z"
         },
         "server/src/generated/types.ts": {
-          "md5": "bb544dfdce407aa0522e6b9728ad8581",
-          "date": "2026-09-07T02:40:27.352Z"
+          "md5": "8fd5b920fdec591488d626e5fbb54bc9",
+          "date": "2026-09-28T13:16:21.771Z"
         },
         "server/src/generated/schema.ts": {
-          "md5": "ebd6c2605392d241d4220a1a889c5674",
-          "date": "2026-09-07T02:40:27.366Z"
+          "md5": "b004d452078e6581befe10599f636aec",
+          "date": "2026-09-28T13:16:21.778Z"
         },
         "server/src/generated/handlers.ts": {
-          "md5": "7776a893548f929b824cf3019efc9ace",
-          "date": "2026-09-05T17:12:58.801Z"
+          "md5": "0871df35ae3adbf4a4ce543535cf5dde",
+          "date": "2026-09-28T14:06:36.222Z"
         },
         "server/src/generated/router.ts": {
-          "md5": "70270f06cb5955bdb31fcf3ab01ecf53",
-          "date": "2026-09-07T02:40:48.844Z"
+          "md5": "2e02864aaf636e042c4a5e84b1de9774",
+          "date": "2026-09-28T13:16:21.793Z"
         }
       },
-      "last_generated": "2026-09-22T20:18:29.089Z",
-      "input_hash": "aec27a8d51cb3a85592a354e4620e5e1"
+      "last_generated": "2026-09-28T14:06:36.222Z",
+      "input_hash": "b27cbffb96a2a9900e9f11ee5f5042b1"
     }
   ]
 }

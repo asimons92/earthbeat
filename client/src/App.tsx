@@ -21,6 +21,7 @@ export default function App() {
             <Route path="effects" element={<EffectLibraryPage />} />
             <Route path="effects/:kindKey" element={<EffectKindDetailPage />} />
             <Route path="patches" element={<PatchLibraryPage />} />
+            <Route path="share/:token" element={<CanvasPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

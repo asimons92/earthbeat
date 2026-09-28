@@ -167,3 +167,78 @@ export function DeletePatchDialog({ open, patchName, onCancel, onConfirm }: Dele
     </Dialog>
   );
 }
+
+type ShareDialogProps = {
+  open: boolean;
+  link: string | null;
+  busy: boolean;
+  failed: boolean;
+  shareLabel: string;
+  stopLabel: string;
+  copyLabel: string;
+  onClose: () => void;
+  onStop: () => void;
+  onCopy: () => void;
+  onPublish: () => void;
+};
+
+export function SharePatchDialog({
+  open,
+  link,
+  busy,
+  failed,
+  shareLabel,
+  stopLabel,
+  copyLabel,
+  onClose,
+  onStop,
+  onCopy,
+  onPublish,
+}: ShareDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>{shareLabel}</DialogTitle>
+          <DialogDescription>
+            Anyone with this link can play this Patch. A signed-in person can save a copy.
+          </DialogDescription>
+        </DialogHeader>
+        {link ? (
+          <div className="grid gap-2">
+            <Label htmlFor="share-link-input">Link</Label>
+            <Input id="share-link-input" readOnly value={link} />
+          </div>
+        ) : (
+          <p className="share-dialog__note">
+            {failed ? 'The link could not be created.' : 'This link is off.'}
+          </p>
+        )}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          {link ? (
+            <>
+              <Button type="button" variant="outline" onClick={onCopy} disabled={busy}>
+                {copyLabel}
+              </Button>
+              <Button type="button" variant="destructive" onClick={onStop}>
+                {stopLabel}
+              </Button>
+            </>
+          ) : (
+            <Button type="button" onClick={onPublish} disabled={busy}>
+              {shareLabel}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

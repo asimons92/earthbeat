@@ -80,6 +80,26 @@
           {
             "key": "delete",
             "label": "Delete"
+          },
+          {
+            "key": "share",
+            "label": "Share"
+          },
+          {
+            "key": "stopSharing",
+            "label": "Stop sharing"
+          },
+          {
+            "key": "copyLink",
+            "label": "Copy link"
+          },
+          {
+            "key": "saveCopy",
+            "label": "Save a copy"
+          },
+          {
+            "key": "sharedMark",
+            "label": "Shared"
           }
         ],
         "navItems": [
@@ -546,6 +566,11 @@
             "required": true,
             "default": 1,
             "description": "Optimistic concurrency token. Every write checks and bumps this value."
+          },
+          {
+            "name": "shareToken",
+            "type": "string",
+            "description": "Unguessable id for one unlisted share link. Empty means the Patch is private. Publish and revoke do not bump version."
           }
         ],
         "commands": [
@@ -650,6 +675,55 @@
                 "type": "json",
                 "required": true,
                 "description": "Full Wire rows for this Patch."
+              }
+            ]
+          },
+          {
+            "name": "publishShare",
+            "description": "Owner only. Sets a share token when missing and returns the current token. Does not bump version.",
+            "parameters": [
+              {
+                "name": "id",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "revokeShare",
+            "description": "Owner only. Clears the share token. Does not bump version.",
+            "parameters": [
+              {
+                "name": "id",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "getByShareToken",
+            "description": "Public read. Returns the Patch name and graph. Omits the owner.",
+            "parameters": [
+              {
+                "name": "token",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "copyFromShare",
+            "description": "Signed-in caller. Creates a new Patch they own from the shared graph. Does not write the source Patch.",
+            "parameters": [
+              {
+                "name": "token",
+                "type": "string",
+                "required": true
+              },
+              {
+                "name": "name",
+                "type": "string",
+                "required": true
               }
             ]
           }

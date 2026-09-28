@@ -38,6 +38,8 @@ export type Patch = {
 
   version: number;
 
+  shareToken?: string;
+
 };
 
 

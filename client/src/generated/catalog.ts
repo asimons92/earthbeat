@@ -552,6 +552,26 @@ export const shellPatchFileActions = [
   {
     "key": "delete",
     "label": "Delete"
+  },
+  {
+    "key": "share",
+    "label": "Share"
+  },
+  {
+    "key": "stopSharing",
+    "label": "Stop sharing"
+  },
+  {
+    "key": "copyLink",
+    "label": "Copy link"
+  },
+  {
+    "key": "saveCopy",
+    "label": "Save a copy"
+  },
+  {
+    "key": "sharedMark",
+    "label": "Shared"
   }
 ] as const;
 

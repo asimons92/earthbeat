@@ -31,8 +31,16 @@ export async function ensureSchema(): Promise<void> {
       name text NOT NULL,
       created_at timestamptz NOT NULL,
       updated_at timestamptz NOT NULL,
-      version integer NOT NULL DEFAULT 1
+      version integer NOT NULL DEFAULT 1,
+      share_token text
     );
+  `);
+  await db.execute(sql`
+    ALTER TABLE patches ADD COLUMN IF NOT EXISTS share_token text;
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS patches_share_token_uidx
+    ON patches (share_token);
   `);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS connectors (

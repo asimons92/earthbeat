@@ -56,6 +56,8 @@ export const patches = pgTable('patches', {
 
   version: integer('version').notNull().default(1),
 
+  shareToken: text('share_token'),
+
 });
 
 
