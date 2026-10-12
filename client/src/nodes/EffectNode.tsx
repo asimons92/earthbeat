@@ -35,8 +35,14 @@ function effectStatusDisplay(data: EffectNodeData): string {
 export function EffectNode({ data }: NodeProps<EffectFlowNode>) {
   return (
     <div className="graph-node graph-node--effect">
-      <Handle type="target" position={Position.Left} id="in" />
-      <Handle type="target" position={Position.Top} id="mod" />
+      <Handle type="target" position={Position.Left} id="in" title="Audio or control in" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="mod"
+        className="graph-node__handle--mod"
+        title="Modulator in"
+      />
       <div className="graph-node__kind">Effect</div>
       <div className="graph-node__title">{data.label}</div>
       <div className="graph-node__status">{effectStatusDisplay(data)}</div>

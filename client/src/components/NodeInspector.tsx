@@ -332,7 +332,7 @@ export function NodeInspector({
 
         <div className="inspector__field">
           <Label htmlFor="modulator-target">Target param</Label>
-          {downstreamOscillator ? (
+          {downstreamOscillator || downstreamEffect ? (
             <Select
               value={data.targetParam.length > 0 ? data.targetParam : undefined}
               onValueChange={(value) => {
@@ -352,7 +352,9 @@ export function NodeInspector({
               </SelectContent>
             </Select>
           ) : (
-            <p className="inspector__empty">Wire this Modulator into an Oscillator (Effects allowed in between).</p>
+            <p className="inspector__empty">
+              Wire this Modulator into an Oscillator, or into an Effect mod handle.
+            </p>
           )}
         </div>
 
