@@ -74,6 +74,13 @@ const effectBodyArb = fc.record({
   timeMs: finiteArb,
   feedback: finiteArb,
   mix: finiteArb,
+  cutoffHz: finiteArb,
+  q: finiteArb,
+  attackSec: finiteArb,
+  decaySec: finiteArb,
+  sustain: finiteArb,
+  releaseSec: finiteArb,
+  gate: finiteArb,
 });
 
 const subjectArb: fc.Arbitrary<CanvasShareSubject> = fc.oneof(
